@@ -1,0 +1,674 @@
+'use client';
+
+import React, { useState, useEffect, useRef } from 'react';
+import Image from 'next/image';
+import { useRouter } from 'next/navigation';
+import { Eye, EyeOff, User, Lock, Info, X, ChevronDown, Trash2, ShieldCheck, UserCheck } from 'lucide-react';
+import LoginInput from '@/components/ui/LoginInput';
+import LoginButton from '@/components/ui/LoginButton';
+import PasswordRecoveryModal from '@/components/modals/PasswordRecoveryModal';
+import { useCustomToast } from '@/hooks/useCustomToast';
+import { UserProfile, UserRole } from '@/types/bitacora';
+import { supabase } from '@/lib/supabase/client';
+
+type AccesoRapido = {
+  id: string;
+  name: string;
+  email: string;
+  password: string;
+  role: UserRole;
+  roleLabel: string;
+};
+
+type SavedAccount = {
+  username: string;
+  password?: string;
+  role?: UserRole;
+};
+
+const ACCESOS_RAPIDOS: AccesoRapido[] = [
+  {
+    id: 'admin',
+    name: 'Daniel Figueroa',
+    email: 'admin@bitacoradigital.com',
+    password: 'mariobros25',
+    role: 'Administrador',
+    roleLabel: 'Administrador (Subir y Gestionar Bitácoras)',
+  },
+  {
+    id: 'usuario',
+    name: 'Jorge Figueroa',
+    email: 'usuario@bitacoradigital.com',
+    password: 'mariobros25',
+    role: 'Usuario',
+    roleLabel: 'Usuario Normal (Consulta y Visor de PDF)',
+  },
+  {
+    id: 'residente',
+    name: 'Raúl Alvarado',
+    email: 'residente@bitacoradigital.com',
+    password: 'mariobros25',
+    role: 'Usuario',
+    roleLabel: 'Ingeniero Residente (Consulta de Bitácoras)',
+  },
+];
+
+export default function LoginPage() {
+  const router = useRouter();
+  const passwordInputRef = useRef<HTMLInputElement>(null);
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [emailError, setEmailError] = useState(false);
+  const [passwordError, setPasswordError] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
+  const [isQuickAccessOpen, setIsQuickAccessOpen] = useState(false);
+  const [isRecoveryOpen, setIsRecoveryOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [rememberedAccounts, setRememberedAccounts] = useState<SavedAccount[]>([]);
+  const [showRememberedDropdown, setShowRememberedDropdown] = useState(false);
+
+  const { showErrorToast, showSuccessToast } = useCustomToast();
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('bitacora_remembered_accounts');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setRememberedAccounts(parsed);
+          setUsername(parsed[0].username);
+          if (parsed[0].password) {
+            setPassword(parsed[0].password);
+          }
+          setRememberMe(true);
+        }
+      }
+    } catch (err) {
+      console.error('Error cargando cuentas recordadas:', err);
+    }
+  }, []);
+
+  const removeRememberedAccount = (usernameToRemove: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const updated = rememberedAccounts.filter(
+      (a) => a.username.toLowerCase() !== usernameToRemove.toLowerCase()
+    );
+    setRememberedAccounts(updated);
+    localStorage.setItem('bitacora_remembered_accounts', JSON.stringify(updated));
+    if (username.toLowerCase() === usernameToRemove.toLowerCase()) {
+      if (updated.length > 0) {
+        setUsername(updated[0].username);
+        setPassword(updated[0].password || '');
+      } else {
+        setUsername('');
+        setPassword('');
+        setRememberMe(false);
+        setShowRememberedDropdown(false);
+      }
+    }
+  };
+
+  const selectRememberedAccount = (acc: SavedAccount) => {
+    setUsername(acc.username);
+    setPassword(acc.password || '');
+    setRememberMe(true);
+    setShowRememberedDropdown(false);
+    setEmailError(false);
+    setPasswordError(false);
+    setTimeout(() => {
+      passwordInputRef.current?.focus();
+    }, 50);
+  };
+
+  const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+
+    if (!username.trim() || !password.trim()) {
+      if (!username.trim()) setEmailError(true);
+      if (!password.trim()) setPasswordError(true);
+      showErrorToast('Ingresa tu correo/usuario y contraseña para continuar.');
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      // 1. Intentar inicio de sesión en Supabase Auth si es un correo
+      let supabaseProfile: UserProfile | null = null;
+      if (supabase && username.includes('@')) {
+        try {
+          const { data: authRes } = await supabase.auth.signInWithPassword({
+            email: username.trim(),
+            password,
+          });
+
+          if (authRes?.user) {
+            const { data: perfilData } = await supabase
+              .from('perfil_usuario')
+              .select('*, usuario(*, rol(*))')
+              .eq('usuario_id', authRes.user.id)
+              .maybeSingle();
+
+            if (perfilData) {
+              const rolNombre = perfilData.usuario?.rol?.nombre_rol || 'Usuario';
+              supabaseProfile = {
+                id: authRes.user.id,
+                nombre: perfilData.nombre_completo || `${perfilData.primer_nombre} ${perfilData.primer_apellido}`,
+                email: authRes.user.email || username.trim(),
+                rol: rolNombre === 'Administrador' ? 'Administrador' : 'Usuario',
+                cargo: perfilData.cargo_puesto || 'Administrador de Proyecto',
+              };
+            }
+          }
+        } catch (_) {}
+      }
+
+      // 2. Determinar rol y perfil según Supabase, Usuarios Registrados o Accesos Rápidos
+      let registeredUser: any = null;
+      try {
+        const storedUsers = localStorage.getItem('bitacora_usuarios_lista');
+        if (storedUsers) {
+          const list = JSON.parse(storedUsers);
+          if (Array.isArray(list)) {
+            registeredUser = list.find(
+              (u: any) =>
+                (u.username && u.username.toLowerCase() === username.trim().toLowerCase()) ||
+                (u.correo && u.correo.toLowerCase() === username.trim().toLowerCase())
+            );
+          }
+        }
+      } catch (_) {}
+
+      const foundQuick = ACCESOS_RAPIDOS.find(
+        (a) =>
+          a.email.toLowerCase() === username.trim().toLowerCase() ||
+          a.id === username.trim().toLowerCase() ||
+          (registeredUser && a.email.toLowerCase() === registeredUser.correo?.toLowerCase())
+      );
+
+      const rolDeterminado: UserRole =
+        supabaseProfile?.rol ||
+        (registeredUser?.rol === 'Administrador' ? 'Administrador' : registeredUser ? 'Usuario' : undefined) ||
+        foundQuick?.role ||
+        (username.toLowerCase().includes('admin') ? 'Administrador' : 'Usuario');
+
+      const userProfile: UserProfile = supabaseProfile || {
+        id: registeredUser?.id || foundQuick?.id || `user-${Date.now()}`,
+        nombre:
+          registeredUser?.nombre ||
+          foundQuick?.name ||
+          (rolDeterminado === 'Administrador' ? 'Daniel Figueroa' : 'Usuario Sistema'),
+        email: registeredUser?.correo || foundQuick?.email || username.trim(),
+        rol: rolDeterminado,
+        cargo:
+          registeredUser?.cargo ||
+          (rolDeterminado === 'Administrador' ? 'Administrador de Proyecto' : 'Supervisor de Campo'),
+      };
+
+      // Guardar sesión
+      localStorage.setItem('bitacora_user_profile', JSON.stringify(userProfile));
+      document.cookie = `bitacora_token=token_${Date.now()}; path=/; max-age=28800; SameSite=Lax`;
+
+      // Gestión de recordar cuentas
+      if (rememberMe) {
+        let accounts = [...rememberedAccounts].filter(
+          (a) => a.username.toLowerCase() !== username.toLowerCase()
+        );
+        accounts.unshift({ username, password, role: rolDeterminado });
+        setRememberedAccounts(accounts);
+        localStorage.setItem('bitacora_remembered_accounts', JSON.stringify(accounts));
+      }
+
+      showSuccessToast('¡Sesión iniciada correctamente!');
+
+      setTimeout(() => {
+        router.push('/dashboard');
+      }, 350);
+    } catch (err: any) {
+      showErrorToast('Error al iniciar sesión. Intenta nuevamente.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <div
+      className="relative min-h-screen w-full overflow-hidden bg-[#140B07]"
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontFamily: "'Poppins', sans-serif",
+      }}
+    >
+      {/* Fondo con carretas y gradiente café oscuro elegante */}
+      <div
+        className="absolute inset-x-0 bottom-[-80px] w-full h-[120vh] overflow-hidden pointer-events-none"
+        style={{
+          backgroundImage: 'url(/fondo_carretas.png)',
+          backgroundSize: 'cover',
+          backgroundPosition: 'center 40%',
+          backgroundAttachment: 'fixed',
+          filter: 'brightness(0.65) contrast(1.1)',
+        }}
+      >
+        <div className="absolute inset-0 bg-gradient-to-t from-[#140B07] via-[#24140C]/85 to-[#0F0804]/95" />
+        <div className="absolute inset-0 bg-[#1C0F08]/65 mix-blend-multiply" />
+        <div className="absolute inset-0 animate-pulse-gradient bg-gradient-radial from-[rgba(74,40,22,0.45)] to-[rgba(20,11,7,0.85)]" />
+      </div>
+
+      {/* TOP NAVBAR: Botón de Acceso Rápido / Demo */}
+      <div className="absolute top-0 left-0 right-0 h-[64px] z-20 flex items-center justify-end pr-6 pointer-events-auto">
+        <button
+          type="button"
+          onClick={() => setIsQuickAccessOpen(true)}
+          style={{
+            width: '40px',
+            height: '40px',
+            borderRadius: '8px',
+            background: 'rgba(255, 255, 255, 0.08)',
+            border: '1px solid rgba(255, 255, 255, 0.15)',
+            color: 'rgba(255, 255, 255, 0.7)',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'all 0.2s',
+            fontSize: '18px',
+          }}
+          onMouseOver={(e) => {
+            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)';
+            e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)';
+            e.currentTarget.style.color = 'rgba(255, 255, 255, 0.9)';
+          }}
+          onMouseOut={(e) => {
+            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)';
+            e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.15)';
+            e.currentTarget.style.color = 'rgba(255, 255, 255, 0.7)';
+          }}
+          title="Acceso rápido demo (Administrador / Usuario)"
+        >
+          ?
+        </button>
+      </div>
+
+      {/* Contenedor principal centrado */}
+      <div
+        className="login-container relative z-10 flex flex-col items-center w-[90%] max-w-[310px]"
+        style={{ transform: 'translateY(2%)' }}
+      >
+        {/* Logo DOMUN */}
+        <div className="mb-3 animate-fadeIn">
+          <Image
+            src="/white_logo.png"
+            alt="DOMUN Logo"
+            width={52}
+            height={50}
+            priority
+            style={{ width: 'auto', height: '50px' }}
+            className="drop-shadow-lg"
+          />
+        </div>
+
+        {/* Título */}
+        <div className="mb-1 text-center animate-fadeIn" style={{ animationDelay: '0.02s' }}>
+          <h1
+            className="text-[22px] font-bold text-white leading-tight"
+            style={{
+              fontFamily: 'Poppins, sans-serif',
+              textShadow: '0 2px 12px rgba(0,0,0,0.4)',
+            }}
+          >
+            Bitácora Digital
+          </h1>
+        </div>
+
+        {/* Subtítulo */}
+        <div className="mb-6 text-center animate-fadeIn" style={{ animationDelay: '0.04s' }}>
+          <p
+            className="text-[12px] font-light text-white/75"
+            style={{ fontFamily: 'Poppins, sans-serif', letterSpacing: '0.02em' }}
+          >
+            VAI - ANCOPIE &bull; Control y Folios en PDF
+          </p>
+        </div>
+
+        {/* Formulario de Login */}
+        <form
+          onSubmit={handleLogin}
+          className="w-full animate-fadeIn"
+          style={{ animationDelay: '0.06s' }}
+        >
+          {/* Input Usuario */}
+          <div className="mb-[14px] relative">
+            <LoginInput
+              id="username"
+              name="username"
+              autoComplete="username"
+              icon={<User size={16} strokeWidth={1.5} />}
+              placeholder="Correo o Usuario"
+              value={username}
+              error={emailError}
+              onChange={(e) => {
+                setUsername(e.target.value);
+                if (emailError) setEmailError(false);
+              }}
+              rightIcon={
+                rememberedAccounts.length > 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => setShowRememberedDropdown(!showRememberedDropdown)}
+                    className="text-white/60 hover:text-white transition-all p-1 focus:outline-none flex items-center justify-center"
+                    title="Seleccionar usuario guardado"
+                  >
+                    <ChevronDown
+                      size={16}
+                      strokeWidth={1.5}
+                      className={`transition-transform duration-200 ${
+                        showRememberedDropdown ? 'rotate-180 text-white' : ''
+                      }`}
+                    />
+                  </button>
+                ) : undefined
+              }
+            />
+
+            {/* Dropdown de usuarios recordados */}
+            {showRememberedDropdown && rememberedAccounts.length > 0 && (
+              <div
+                className="absolute left-0 right-0 top-[42px] z-50 rounded-lg border border-white/20 bg-[#1C100A]/95 shadow-2xl backdrop-blur-md overflow-hidden max-h-[160px] overflow-y-auto animate-fadeIn"
+                style={{ fontFamily: 'Poppins, sans-serif' }}
+              >
+                <div className="px-3 py-1.5 border-b border-white/10 text-[10px] uppercase font-semibold text-white/50 tracking-wider flex justify-between items-center bg-black/30">
+                  <span>Usuarios Guardados</span>
+                  <span className="text-[9px] text-white/40">
+                    {rememberedAccounts.length}
+                  </span>
+                </div>
+                {rememberedAccounts.map((acc, idx) => (
+                  <div
+                    key={idx}
+                    onClick={() => selectRememberedAccount(acc)}
+                    className={`flex items-center justify-between px-3 py-2 cursor-pointer transition-colors hover:bg-white/15 ${
+                      username.toLowerCase() === acc.username.toLowerCase()
+                        ? 'bg-white/20'
+                        : ''
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 overflow-hidden pr-2">
+                      <User size={13} className="text-amber-200 shrink-0" />
+                      <span className="text-[12px] text-white/90 truncate font-medium">
+                        {acc.username}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={(e) => removeRememberedAccount(acc.username, e)}
+                      className="text-white/40 hover:text-red-400 p-1 transition-colors shrink-0"
+                      title="Eliminar de recordados"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Input Contraseña */}
+          <div className="mb-[10px]">
+            <LoginInput
+              id="password"
+              name="password"
+              autoComplete="current-password"
+              inputRef={passwordInputRef}
+              icon={<Lock size={16} strokeWidth={1.5} />}
+              type={showPassword ? 'text' : 'password'}
+              placeholder="Contraseña"
+              value={password}
+              error={passwordError}
+              onChange={(e) => {
+                setPassword(e.target.value);
+                if (passwordError) setPasswordError(false);
+              }}
+              rightIcon={
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="text-white/60 hover:text-white transition-colors"
+                  aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                >
+                  {showPassword ? (
+                    <EyeOff size={16} strokeWidth={1.5} />
+                  ) : (
+                    <Eye size={16} strokeWidth={1.5} />
+                  )}
+                </button>
+              }
+            />
+          </div>
+
+          {/* Opciones extra: Recordarme y Olvidaste tu contraseña */}
+          <div className="mt-[8px] mb-[22px] flex items-center justify-between">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+                className="w-4 h-4 rounded border border-white/50 bg-transparent cursor-pointer accent-[#4A2810]"
+              />
+              <span
+                className="text-xs text-white"
+                style={{ fontFamily: 'Poppins, sans-serif' }}
+              >
+                Recuérdame
+              </span>
+            </label>
+
+            <button
+              type="button"
+              onClick={() => setIsRecoveryOpen(true)}
+              className="text-xs text-white hover:text-white/80 underline transition-colors cursor-pointer focus:outline-none font-medium"
+              style={{ fontFamily: 'Poppins, sans-serif', color: '#ffffff' }}
+            >
+              ¿Olvidaste tu contraseña?
+            </button>
+          </div>
+
+          {/* Login Button */}
+          <LoginButton type="submit" disabled={isSubmitting}>
+            {isSubmitting ? 'Ingresando...' : 'Iniciar sesión'}
+          </LoginButton>
+        </form>
+      </div>
+
+      {/* Quick Access Modal (Acceso Rápido por Roles) */}
+      {isQuickAccessOpen && (
+        <>
+          <div
+            onClick={() => setIsQuickAccessOpen(false)}
+            style={{
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(0, 0, 0, 0.6)',
+              zIndex: 9998,
+              backdropFilter: 'blur(4px)',
+            }}
+          />
+
+          <div
+            style={{
+              position: 'fixed',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              zIndex: 9999,
+              width: '92%',
+              maxWidth: '430px',
+            }}
+          >
+            <div
+              style={{
+                background: 'rgba(28, 16, 10, 0.96)',
+                border: '1px solid rgba(255, 255, 255, 0.12)',
+                borderRadius: '16px',
+                padding: '24px',
+                backdropFilter: 'blur(20px)',
+                boxShadow: '0 25px 60px rgba(0, 0, 0, 0.6)',
+              }}
+            >
+              {/* Header */}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  marginBottom: '18px',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div
+                    style={{
+                      padding: '8px',
+                      background: 'rgba(255, 255, 255, 0.08)',
+                      border: '1px solid rgba(255, 255, 255, 0.15)',
+                      borderRadius: '8px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <Info size={18} color="#ffffff" />
+                  </div>
+                  <div>
+                    <h2
+                      style={{
+                        margin: '0',
+                        fontSize: '15px',
+                        fontWeight: 700,
+                        color: 'rgba(255, 255, 255, 0.95)',
+                        fontFamily: "'Poppins', sans-serif",
+                      }}
+                    >
+                      Acceso Rápido por Rol
+                    </h2>
+                    <p
+                      style={{
+                        margin: '2px 0 0',
+                        fontSize: '11px',
+                        color: 'rgba(255, 255, 255, 0.65)',
+                        fontFamily: "'Poppins', sans-serif",
+                      }}
+                    >
+                      Selecciona una cuenta para probar los 2 roles
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsQuickAccessOpen(false)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    color: 'rgba(255, 255, 255, 0.6)',
+                  }}
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* Accounts */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '16px' }}>
+                {ACCESOS_RAPIDOS.map((cuenta) => (
+                  <button
+                    key={cuenta.id}
+                    type="button"
+                    onClick={() => {
+                      setUsername(cuenta.email);
+                      setPassword(cuenta.password);
+                      setIsQuickAccessOpen(false);
+                    }}
+                    style={{
+                      padding: '12px 14px',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      borderRadius: '10px',
+                      background: 'rgba(255, 255, 255, 0.04)',
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      transition: 'all 0.2s',
+                    }}
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)';
+                      e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)';
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.04)';
+                      e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+                    }}
+                  >
+                    <div>
+                      <div
+                        style={{
+                          fontSize: '12.5px',
+                          fontWeight: 700,
+                          color: '#FFFFFF',
+                          fontFamily: "'Poppins', sans-serif",
+                        }}
+                      >
+                        <span>{cuenta.roleLabel}</span>
+                      </div>
+                      <div
+                        style={{
+                          fontSize: '11px',
+                          color: 'rgba(255, 255, 255, 0.65)',
+                          marginTop: '3px',
+                          fontFamily: "'Poppins', sans-serif",
+                        }}
+                      >
+                        {cuenta.name} &bull; {cuenta.email}
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+
+              {/* Info Note */}
+              <div
+                style={{
+                  padding: '10px 12px',
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  borderRadius: '8px',
+                }}
+              >
+                <p
+                  style={{
+                    margin: 0,
+                    fontSize: '11px',
+                    color: 'rgba(255, 255, 255, 0.85)',
+                    fontFamily: "'Poppins', sans-serif",
+                    lineHeight: '1.4',
+                  }}
+                >
+                  <strong className="text-white">Rol Administrador:</strong> Puede subir documentos PDF al bucket de Supabase y publicarlos en los días. <strong className="text-white">Rol Usuario:</strong> Puede explorar meses, días y consultar los PDF embebidos.
+                </p>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Modal de recuperación de contraseña */}
+      <PasswordRecoveryModal
+        isOpen={isRecoveryOpen}
+        onClose={() => setIsRecoveryOpen(false)}
+      />
+    </div>
+  );
+}
