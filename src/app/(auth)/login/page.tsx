@@ -243,21 +243,26 @@ export default function LoginPage() {
         fontFamily: "'Poppins', sans-serif",
       }}
     >
-      {/* Fondo con carretas y gradiente café oscuro elegante */}
+      {/* Fondo con carretas y capa oscura para mejorar la legibilidad */}
       <div
-        className="absolute inset-x-0 bottom-[-80px] w-full h-[120vh] overflow-hidden pointer-events-none"
+        aria-hidden="true"
+        className="absolute inset-0 overflow-hidden pointer-events-none"
         style={{
-          backgroundImage: 'url(/fondo_carretas.png)',
+          backgroundImage: 'url(/img.jpeg)',
           backgroundSize: 'cover',
-          backgroundPosition: 'center 40%',
+          backgroundPosition: 'center center',
           backgroundAttachment: 'fixed',
-          filter: 'brightness(0.65) contrast(1.1)',
         }}
-      >
-        <div className="absolute inset-0 bg-gradient-to-t from-[#140B07] via-[#24140C]/85 to-[#0F0804]/95" />
-        <div className="absolute inset-0 bg-[#1C0F08]/65 mix-blend-multiply" />
-        <div className="absolute inset-0 animate-pulse-gradient bg-gradient-radial from-[rgba(74,40,22,0.45)] to-[rgba(20,11,7,0.85)]" />
-      </div>
+      />
+      <div
+        aria-hidden="true"
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          background:
+            'linear-gradient(180deg, rgba(72, 70, 71, 1) 0%, rgba(8, 4, 3, 0.58) 48%, rgba(8, 4, 3, 0.8) 100%), rgba(1, 4, 3, 0.22',
+        }}
+      />
+
 
       {/* TOP NAVBAR: Botón de Acceso Rápido / Demo */}
       <div className="absolute top-0 left-0 right-0 h-[64px] z-20 flex items-center justify-end pr-6 pointer-events-auto">
@@ -302,12 +307,12 @@ export default function LoginPage() {
         {/* Logo DOMUN */}
         <div className="mb-3 animate-fadeIn">
           <Image
-            src="/white_logo.png"
+            src="/logo.png"
             alt="DOMUN Logo"
-            width={52}
-            height={50}
+            width={400}
+            height={440}
             priority
-            style={{ width: 'auto', height: '50px' }}
+            style={{ width: 'auto', height: '58px' }}
             className="drop-shadow-lg"
           />
         </div>
@@ -321,17 +326,17 @@ export default function LoginPage() {
               textShadow: '0 2px 12px rgba(0,0,0,0.4)',
             }}
           >
-            Bitácora Digital
+            Bitácora Electrónica
           </h1>
         </div>
 
         {/* Subtítulo */}
         <div className="mb-6 text-center animate-fadeIn" style={{ animationDelay: '0.04s' }}>
           <p
-            className="text-[12px] font-light text-white/75"
+            className="text-[12px] font-light text-orange-100/85"
             style={{ fontFamily: 'Poppins, sans-serif', letterSpacing: '0.02em' }}
           >
-            VAI - ANCOPIE &bull; Control y Folios en PDF
+            Proyecto: Conexion VAS - Hincapie
           </p>
         </div>
 
@@ -360,14 +365,14 @@ export default function LoginPage() {
                   <button
                     type="button"
                     onClick={() => setShowRememberedDropdown(!showRememberedDropdown)}
-                    className="text-white/60 hover:text-white transition-all p-1 focus:outline-none flex items-center justify-center"
+                    className="text-[#ff170f] hover:text-[#ff5b55] transition-all p-1 focus:outline-none flex items-center justify-center"
                     title="Seleccionar usuario guardado"
                   >
                     <ChevronDown
                       size={16}
                       strokeWidth={1.5}
                       className={`transition-transform duration-200 ${
-                        showRememberedDropdown ? 'rotate-180 text-white' : ''
+                        showRememberedDropdown ? 'rotate-180 text-[#ff5b55]' : ''
                       }`}
                     />
                   </button>
@@ -378,12 +383,12 @@ export default function LoginPage() {
             {/* Dropdown de usuarios recordados */}
             {showRememberedDropdown && rememberedAccounts.length > 0 && (
               <div
-                className="absolute left-0 right-0 top-[42px] z-50 rounded-lg border border-white/20 bg-[#1C100A]/95 shadow-2xl backdrop-blur-md overflow-hidden max-h-[160px] overflow-y-auto animate-fadeIn"
+                className="absolute left-0 right-0 top-[42px] z-50 rounded-lg border border-orange-300/30 bg-[#24150d]/95 shadow-2xl backdrop-blur-md overflow-hidden max-h-[160px] overflow-y-auto animate-fadeIn"
                 style={{ fontFamily: 'Poppins, sans-serif' }}
               >
-                <div className="px-3 py-1.5 border-b border-white/10 text-[10px] uppercase font-semibold text-white/50 tracking-wider flex justify-between items-center bg-black/30">
+                <div className="px-3 py-1.5 border-b border-orange-200/20 text-[10px] uppercase font-semibold text-orange-100/70 tracking-wider flex justify-between items-center bg-black/30">
                   <span>Usuarios Guardados</span>
-                  <span className="text-[9px] text-white/40">
+                  <span className="text-[9px] text-orange-100/60">
                     {rememberedAccounts.length}
                   </span>
                 </div>
@@ -398,15 +403,15 @@ export default function LoginPage() {
                     }`}
                   >
                     <div className="flex items-center gap-2 overflow-hidden pr-2">
-                      <User size={13} className="text-amber-200 shrink-0" />
-                      <span className="text-[12px] text-white/90 truncate font-medium">
+                      <User size={13} className="text-orange-300 shrink-0" />
+                      <span className="text-[12px] text-orange-50/95 truncate font-medium">
                         {acc.username}
                       </span>
                     </div>
                     <button
                       type="button"
                       onClick={(e) => removeRememberedAccount(acc.username, e)}
-                      className="text-white/40 hover:text-red-400 p-1 transition-colors shrink-0"
+                      className="text-orange-100/50 hover:text-red-400 p-1 transition-colors shrink-0"
                       title="Eliminar de recordados"
                     >
                       <Trash2 size={13} />
@@ -437,7 +442,7 @@ export default function LoginPage() {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="text-white/60 hover:text-white transition-colors"
+                  className="text-white hover:text-white/80 transition-colors"
                   aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
                 >
                   {showPassword ? (
@@ -457,10 +462,10 @@ export default function LoginPage() {
                 type="checkbox"
                 checked={rememberMe}
                 onChange={(e) => setRememberMe(e.target.checked)}
-                className="w-4 h-4 rounded border border-white/50 bg-transparent cursor-pointer accent-[#4A2810]"
+                className="w-4 h-4 rounded border border-orange-300/70 bg-transparent cursor-pointer accent-orange-500"
               />
               <span
-                className="text-xs text-white"
+                className="text-xs text-orange-50"
                 style={{ fontFamily: 'Poppins, sans-serif' }}
               >
                 Recuérdame
@@ -471,7 +476,7 @@ export default function LoginPage() {
               type="button"
               onClick={() => setIsRecoveryOpen(true)}
               className="text-xs text-white hover:text-white/80 underline transition-colors cursor-pointer focus:outline-none font-medium"
-              style={{ fontFamily: 'Poppins, sans-serif', color: '#ffffff' }}
+              style={{ fontFamily: 'Poppins, sans-serif' }}
             >
               ¿Olvidaste tu contraseña?
             </button>

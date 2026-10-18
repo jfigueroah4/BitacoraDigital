@@ -77,6 +77,8 @@ export default function UsuariosPage() {
   const router = useRouter();
   const [usuarios, setUsuarios] = useState<Usuario[]>(USUARIOS_BASE);
   const [loading, setLoading] = useState(false);
+  const [currentUserEmail, setCurrentUserEmail] = useState('');
+  const [isAdmin, setIsAdmin] = useState(false);
 
   // Filtros
   const [busqueda, setBusqueda] = useState('');
@@ -152,6 +154,19 @@ export default function UsuariosPage() {
     } catch (_) {}
     finally {
       setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      const storedProfile = localStorage.getItem('bitacora_user_profile');
+      if (storedProfile) {
+        const profile = JSON.parse(storedProfile);
+        setCurrentUserEmail(profile.email || '');
+        setIsAdmin(profile.rol === 'Administrador');
+      }
+    } catch (err) {
+      console.error('Error cargando permisos del usuario:', err);
     }
   }, []);
 
@@ -364,22 +379,24 @@ export default function UsuariosPage() {
           </div>
 
           <div className="flex items-center gap-2">
-            <Link
-              href="/dashboard/roles"
-              className="flex items-center gap-1.5 px-3.5 py-2 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 text-xs font-semibold rounded-xl transition-all shadow-2xs cursor-pointer active:scale-95"
-            >
-              <Shield size={14} className="text-[#3B2219]" />
-              <span>Gestión de Roles</span>
-            </Link>
+            {isAdmin && (
+              <Link
+                href="/dashboard/roles"
+                className="flex items-center gap-1.5 px-3.5 py-2 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 text-xs font-semibold rounded-xl transition-all shadow-2xs cursor-pointer active:scale-95"
+              >
+                <Shield size={14} className="text-[#3B2219]" />
+                <span>Gestión de Roles</span>
+              </Link>
+            )}
 
-            <button
+            {isAdmin && <button
               type="button"
               onClick={handleNuevo}
               className="flex items-center gap-1.5 px-4 py-2 bg-[#3B2219] hover:bg-[#2A1710] text-white text-xs font-bold rounded-xl transition-all shadow-xs cursor-pointer active:scale-95"
             >
               <Plus size={15} strokeWidth={2.5} />
               <span>Nuevo Usuario</span>
-            </button>
+            </button>}
           </div>
         </div>
 
@@ -433,12 +450,6 @@ export default function UsuariosPage() {
             >
               <option value="Todos">Todos los roles</option>
               <option value="Administrador">Administrador</option>
-              <option value="Gerencia">Gerencia</option>
-              <option value="IngenieroResidente">Ingeniero Residente</option>
-              <option value="Laboratorista">Laboratorista</option>
-              <option value="AuxiliarDeCampo">Auxiliar de Campo</option>
-              <option value="Contratante">Contratante</option>
-              <option value="Supervisor">Supervisor</option>
               <option value="Usuario">Usuario</option>
             </select>
           </div>
@@ -455,6 +466,8 @@ export default function UsuariosPage() {
           onEditar={handleEditar}
           onEliminar={handleOpenDelete}
           onCerrarSesion={handleCerrarSesionRemota}
+          currentUserEmail={currentUserEmail}
+          canManage={isAdmin}
         />
 
         {/* Paginación Inferior idéntica a DomunNet */}
@@ -538,4 +551,3 @@ export default function UsuariosPage() {
     </div>
   );
 }
-

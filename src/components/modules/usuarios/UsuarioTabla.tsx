@@ -14,6 +14,7 @@ interface UsuarioTablaProps {
   onEliminar: (id: string, modoModal?: 'todos' | 'activar' | 'eliminar' | 'suspender') => void;
   onCerrarSesion?: (usuario: Usuario) => void;
   currentUserEmail?: string;
+  canManage?: boolean;
 }
 
 export const UsuarioTabla = React.memo(function UsuarioTabla({
@@ -23,6 +24,7 @@ export const UsuarioTabla = React.memo(function UsuarioTabla({
   onEliminar,
   onCerrarSesion,
   currentUserEmail,
+  canManage = true,
 }: UsuarioTablaProps) {
   const [sortColumn, setSortColumn] = useState<string>('');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
@@ -122,7 +124,7 @@ export const UsuarioTabla = React.memo(function UsuarioTabla({
                   <span>Ver</span>
                 </button>
 
-                <button
+                {canManage && <button
                   type="button"
                   onClick={() => onEditar(usuario)}
                   className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-gray-200 bg-white text-gray-700 text-[10px] font-semibold hover:bg-gray-50 cursor-pointer shadow-2xs"
@@ -130,9 +132,9 @@ export const UsuarioTabla = React.memo(function UsuarioTabla({
                 >
                   <Edit2 size={12} className="text-gray-600" />
                   <span>Editar</span>
-                </button>
+                </button>}
 
-                {usuario.estado === 'Activo' && !isSelf && (
+                {canManage && usuario.estado === 'Activo' && !isSelf && (
                   <button
                     type="button"
                     onClick={() => onCerrarSesion?.(usuario)}
@@ -143,7 +145,7 @@ export const UsuarioTabla = React.memo(function UsuarioTabla({
                   </button>
                 )}
 
-                {esSuspendido ? (
+                {canManage && (esSuspendido ? (
                   <>
                     <button
                       type="button"
@@ -176,7 +178,7 @@ export const UsuarioTabla = React.memo(function UsuarioTabla({
                   >
                     <UserX size={12} />
                   </button>
-                )}
+                ))}
               </div>
             </div>
           );
@@ -271,16 +273,16 @@ export const UsuarioTabla = React.memo(function UsuarioTabla({
                           <Eye size={13} />
                         </button>
 
-                        <button
+                        {canManage && <button
                           type="button"
                           onClick={() => onEditar(usuario)}
                           className="p-1 text-gray-400 hover:text-blue-600 transition-colors cursor-pointer"
                           title="Editar usuario"
                         >
                           <Edit2 size={13} />
-                        </button>
+                        </button>}
 
-                        {usuario.estado === 'Activo' && !isSelf && (
+                        {canManage && usuario.estado === 'Activo' && !isSelf && (
                           <button
                             type="button"
                             onClick={() => onCerrarSesion?.(usuario)}
@@ -291,7 +293,7 @@ export const UsuarioTabla = React.memo(function UsuarioTabla({
                           </button>
                         )}
 
-                        {esSuspendido ? (
+                        {canManage && (esSuspendido ? (
                           <>
                             <button
                               type="button"
@@ -324,7 +326,7 @@ export const UsuarioTabla = React.memo(function UsuarioTabla({
                           >
                             <UserX size={13} />
                           </button>
-                        )}
+                        ))}
                       </div>
                     </td>
                   </tr>

@@ -107,15 +107,17 @@ export default function VistaMeses({
                 {nombreMesInicio} {duracionProyecto.anioInicio} — {nombreMesFin} {duracionProyecto.anioFin}
               </span>
             </div>
-            <button
-              type="button"
-              onClick={handleAbrirModalDuracion}
-              className="ml-1 text-[10px] font-bold text-[#3B2219] hover:text-[#2A1710] hover:underline flex items-center gap-1 px-1.5 py-0.5 rounded-md hover:bg-[#F4ECE6] transition-colors cursor-pointer"
-              title="Establecer duración del proyecto"
-            >
-              <Settings size={12} />
-              <span>Establecer</span>
-            </button>
+            {esAdmin && (
+              <button
+                type="button"
+                onClick={handleAbrirModalDuracion}
+                className="ml-1 text-[10px] font-bold text-[#3B2219] hover:text-[#2A1710] hover:underline flex items-center gap-1 px-1.5 py-0.5 rounded-md hover:bg-[#F4ECE6] transition-colors cursor-pointer"
+                title="Establecer duración del proyecto"
+              >
+                <Settings size={12} />
+                <span>Establecer</span>
+              </button>
+            )}
           </div>
 
           {/* Contador de folios ubicado directamente arriba del botón Subir Documento */}
@@ -313,7 +315,7 @@ export default function VistaMeses({
 
       {/* Modal para establecer la duración del proyecto adaptado y pulido */}
       {modalDuracionAbierto && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-2xs animate-fadeIn">
+        <div className="fixed left-0 top-0 z-[100] flex h-screen w-screen items-center justify-center bg-black/60 p-4 backdrop-blur-2xs animate-fadeIn">
           <div className="bg-white rounded-2xl shadow-2xl border border-gray-200 w-full max-w-md overflow-hidden animate-scaleIn">
             <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-100 bg-gray-50/80">
               <div className="flex items-center gap-2.5">
