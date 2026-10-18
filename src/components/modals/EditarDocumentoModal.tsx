@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { X, PencilLine, Calendar, FileText, UploadCloud, Loader2, Check } from 'lucide-react';
 import { DocumentoBitacora } from '@/types/bitacora';
 import { MESES_NOMBRES } from '@/lib/mockData';
@@ -19,6 +19,7 @@ interface EditarDocumentoModalProps {
     anio: number;
     file?: File;
   }) => Promise<void>;
+  documentosExistentes?: DocumentoBitacora[];
 }
 
 export default function EditarDocumentoModal({
@@ -26,6 +27,7 @@ export default function EditarDocumentoModal({
   isOpen,
   onClose,
   onGuardar,
+  documentosExistentes = [],
 }: EditarDocumentoModalProps) {
   const [titulo, setTitulo] = useState('');
   const [descripcion, setDescripcion] = useState('');
@@ -35,6 +37,15 @@ export default function EditarDocumentoModal({
   const [nuevoArchivo, setNuevoArchivo] = useState<File | null>(null);
   const [guardando, setGuardando] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Días ocupados por otros documentos en el mismo mes y año (excluyendo el que se edita)
+  const diasOcupados = useMemo(() => {
+    return new Set(
+      (documentosExistentes || [])
+        .filter((d) => d.id !== documento?.id && d.mes === mes && d.anio === anio)
+        .map((d) => d.dia)
+    );
+  }, [documentosExistentes, documento?.id, mes, anio]);
 
   useEffect(() => {
     if (documento) {
@@ -47,11 +58,25 @@ export default function EditarDocumentoModal({
     }
   }, [documento, isOpen]);
 
+  // Si al cambiar de mes o año el día queda en una fecha ocupada, ajustar a un día libre
+  useEffect(() => {
+    if (isOpen && diasOcupados.has(dia)) {
+      const diasTotales = new Date(anio, mes, 0).getDate();
+      const primerLibre = Array.from({ length: diasTotales }, (_, i) => i + 1).find(
+        (d) => !diasOcupados.has(d)
+      );
+      if (primerLibre) {
+        setDia(primerLibre);
+      }
+    }
+  }, [isOpen, diasOcupados, dia, mes, anio]);
+
   if (!isOpen || !documento) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!titulo.trim()) return;
+    if (diasOcupados.has(dia)) return;
 
     setGuardando(true);
     try {
@@ -123,11 +148,19 @@ export default function EditarDocumentoModal({
                   onChange={(e) => setDia(Number(e.target.value))}
                   className="w-full px-2.5 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 outline-none focus:border-[#3B2219] cursor-pointer"
                 >
-                  {Array.from({ length: diasEnMesActual }, (_, i) => i + 1).map((d) => (
-                    <option key={d} value={d}>
-                      Día {d}
-                    </option>
-                  ))}
+                  {Array.from({ length: diasEnMesActual }, (_, i) => i + 1).map((d) => {
+                    const estaOcupado = diasOcupados.has(d);
+                    return (
+                      <option
+                        key={d}
+                        value={d}
+                        disabled={estaOcupado}
+                        className={estaOcupado ? 'text-gray-300 bg-gray-100 font-normal' : ''}
+                      >
+                        {d}
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
 
@@ -171,6 +204,16 @@ export default function EditarDocumentoModal({
                 </select>
               </div>
             </div>
+
+            {diasOcupados.has(dia) ? (
+              <p className="text-[10px] text-red-600 font-semibold mt-1.5">
+                El día {dia} ya tiene otro folio registrado. Por favor selecciona otro día.
+              </p>
+            ) : diasOcupados.size > 0 ? (
+              <p className="text-[10px] text-gray-400 mt-1.5">
+                Los días deshabilitados ya cuentan con un folio registrado.
+              </p>
+            ) : null}
           </div>
 
           {/* Título o Folio */}
@@ -250,7 +293,7 @@ export default function EditarDocumentoModal({
             </button>
             <button
               type="submit"
-              disabled={guardando || !titulo.trim()}
+              disabled={guardando || !titulo.trim() || diasOcupados.has(dia)}
               className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#3B2219] hover:bg-[#2A1710] text-white text-xs font-bold rounded-xl transition-colors shadow-2xs disabled:opacity-50 cursor-pointer"
             >
               {guardando ? (

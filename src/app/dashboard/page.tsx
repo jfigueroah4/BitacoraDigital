@@ -329,6 +329,7 @@ export default function DashboardPage() {
         isOpen={Boolean(documentoParaEditar)}
         onClose={() => setDocumentoParaEditar(null)}
         onGuardar={handleGuardarEdicion}
+        documentosExistentes={documentos}
       />
 
       {/* MODAL DE CONFIRMACIÓN DE ELIMINACIÓN */}
@@ -349,6 +350,7 @@ export default function DashboardPage() {
         anioSugerido={anioSugeridoParaSubir}
         usuarioNombre={userProfile?.nombre || 'Administrador'}
         onDocumentoSubido={handleDocumentoSubido}
+        documentosExistentes={documentos}
       />
     </div>
   );

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { X, UploadCloud, FileText, CheckCircle, AlertTriangle, ShieldCheck, Loader2, Calendar } from 'lucide-react';
 import { DocumentoBitacora } from '@/types/bitacora';
 import { MESES_NOMBRES, getDiasEnMes } from '@/lib/mockData';
@@ -15,6 +15,7 @@ interface SubirDocumentoModalProps {
   anioSugerido?: number;
   usuarioNombre: string;
   onDocumentoSubido: (doc: DocumentoBitacora) => void;
+  documentosExistentes?: DocumentoBitacora[];
 }
 
 export default function SubirDocumentoModal({
@@ -25,6 +26,7 @@ export default function SubirDocumentoModal({
   anioSugerido = 2026,
   usuarioNombre,
   onDocumentoSubido,
+  documentosExistentes = [],
 }: SubirDocumentoModalProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [dia, setDia] = useState<number>(diaSugerido);
@@ -37,12 +39,34 @@ export default function SubirDocumentoModal({
   const [mostrarConfirmacion, setMostrarConfirmacion] = useState(false);
   const [subiendo, setSubiendo] = useState(false);
 
+  // Días que ya cuentan con un folio registrado en el mes y año seleccionados
+  const diasOcupados = useMemo(() => {
+    return new Set(
+      (documentosExistentes || [])
+        .filter((d) => d.mes === mes && d.anio === anio)
+        .map((d) => d.dia)
+    );
+  }, [documentosExistentes, mes, anio]);
+
   // Update when suggested day/month changes
   useEffect(() => {
     if (diaSugerido) setDia(diaSugerido);
     if (mesSugerido) setMes(mesSugerido);
     if (anioSugerido) setAnio(anioSugerido);
   }, [diaSugerido, mesSugerido, anioSugerido, isOpen]);
+
+  // Si el día seleccionado está ocupado, auto-ajustar al primer día libre disponible
+  useEffect(() => {
+    if (isOpen && diasOcupados.has(dia)) {
+      const diasTotales = getDiasEnMes(mes, anio);
+      const primerLibre = Array.from({ length: diasTotales }, (_, i) => i + 1).find(
+        (d) => !diasOcupados.has(d)
+      );
+      if (primerLibre) {
+        setDia(primerLibre);
+      }
+    }
+  }, [isOpen, diasOcupados, dia, mes, anio]);
 
   // Handle escape key
   useEffect(() => {
@@ -81,6 +105,10 @@ export default function SubirDocumentoModal({
 
   const handleValidarAntesDeConfirmar = (e: React.FormEvent) => {
     e.preventDefault();
+    if (diasOcupados.has(dia)) {
+      showErrorToast(`El día ${dia} ya cuenta con un folio registrado. Selecciona un día libre.`);
+      return;
+    }
     if (!archivo) {
       showErrorToast('Debes adjuntar el documento PDF de la bitácora.');
       return;
@@ -188,11 +216,19 @@ export default function SubirDocumentoModal({
                       onChange={(e) => setDia(Number(e.target.value))}
                       className="w-full px-2.5 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 outline-none focus:border-[#3B2219] cursor-pointer"
                     >
-                      {Array.from({ length: diasEnMesActual }, (_, i) => i + 1).map((d) => (
-                        <option key={d} value={d}>
-                          Día {d}
-                        </option>
-                      ))}
+                      {Array.from({ length: diasEnMesActual }, (_, i) => i + 1).map((d) => {
+                        const estaOcupado = diasOcupados.has(d);
+                        return (
+                          <option
+                            key={d}
+                            value={d}
+                            disabled={estaOcupado}
+                            className={estaOcupado ? 'text-gray-300 bg-gray-100 font-normal' : ''}
+                          >
+                            {d}
+                          </option>
+                        );
+                      })}
                     </select>
                   </div>
 
@@ -242,6 +278,16 @@ export default function SubirDocumentoModal({
                     </select>
                   </div>
                 </div>
+
+                {diasOcupados.has(dia) ? (
+                  <p className="text-[10px] text-red-600 font-semibold mt-1.5">
+                    El día {dia} ya tiene un folio registrado. Por favor selecciona otro día.
+                  </p>
+                ) : diasOcupados.size > 0 ? (
+                  <p className="text-[10px] text-gray-400 mt-1.5">
+                    Los días deshabilitados ya cuentan con un folio registrado.
+                  </p>
+                ) : null}
               </div>
 
               {/* Título o Folio */}
@@ -406,7 +452,7 @@ export default function SubirDocumentoModal({
               <button
                 type="submit"
                 form="drawer-subir-form"
-                disabled={!archivo || !titulo.trim()}
+                disabled={!archivo || !titulo.trim() || diasOcupados.has(dia)}
                 className="px-4 py-2 bg-[#3B2219] hover:bg-[#2A1710] text-white text-xs font-bold rounded-xl transition-colors shadow-2xs disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
               >
                 Continuar a confirmación
