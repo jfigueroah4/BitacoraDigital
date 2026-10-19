@@ -1,51 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { DURACION_PROYECTO_DEFAULT, DuracionProyecto } from '@/lib/mockData';
-import fs from 'fs';
-import path from 'path';
 
-const CONFIG_FILE = path.join(process.cwd(), 'duracion-config.json');
+export const runtime = 'edge';
 
-function leerDuracionGuardada(): DuracionProyecto {
-  try {
-    if (fs.existsSync(CONFIG_FILE)) {
-      const data = fs.readFileSync(CONFIG_FILE, 'utf-8');
-      const parsed = JSON.parse(data);
-      if (
-        parsed &&
-        typeof parsed.mesInicio === 'number' &&
-        typeof parsed.anioInicio === 'number' &&
-        typeof parsed.mesFin === 'number' &&
-        typeof parsed.anioFin === 'number'
-      ) {
-        return parsed;
-      }
-    }
-  } catch (_) {}
-  return DURACION_PROYECTO_DEFAULT;
-}
-
-function guardarDuracionEnDisco(duracion: DuracionProyecto) {
-  try {
-    fs.writeFileSync(CONFIG_FILE, JSON.stringify(duracion, null, 2), 'utf-8');
-  } catch (_) {}
-}
-
-let duracionServidor: DuracionProyecto = leerDuracionGuardada();
+// Fallback en memoria en la instancia Edge
+let duracionServidor: DuracionProyecto = DURACION_PROYECTO_DEFAULT;
 
 export async function GET(req: NextRequest) {
-  // 1. Check in-memory / disk
   let actual = duracionServidor;
-  if (actual === DURACION_PROYECTO_DEFAULT) {
-    actual = leerDuracionGuardada();
-    duracionServidor = actual;
-  }
 
-  // 2. Fallback to cookie if present
+  // Si la cookie del cliente contiene una duración configurada, priorizarla
   const cookieVal = req.cookies.get('bitacora_duracion_proyecto')?.value;
   if (cookieVal) {
     try {
       const parsedCookie = JSON.parse(decodeURIComponent(cookieVal));
-      if (parsedCookie?.mesInicio && parsedCookie?.anioInicio) {
+      if (
+        parsedCookie &&
+        typeof parsedCookie.mesInicio === 'number' &&
+        typeof parsedCookie.anioInicio === 'number' &&
+        typeof parsedCookie.mesFin === 'number' &&
+        typeof parsedCookie.anioFin === 'number'
+      ) {
         actual = parsedCookie;
         duracionServidor = actual;
       }
@@ -75,12 +50,11 @@ export async function POST(req: NextRequest) {
         anioFin: body.anioFin,
       };
 
-      guardarDuracionEnDisco(duracionServidor);
-
       const res = NextResponse.json({ success: true, duracion: duracionServidor });
+      // Persistir en cookie a nivel de dominio por 5 años
       res.cookies.set('bitacora_duracion_proyecto', encodeURIComponent(JSON.stringify(duracionServidor)), {
         path: '/',
-        maxAge: 60 * 60 * 24 * 365 * 5, // 5 years
+        maxAge: 60 * 60 * 24 * 365 * 5, // 5 años
         sameSite: 'lax',
       });
       return res;
