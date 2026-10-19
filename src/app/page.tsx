@@ -1,6 +1,8 @@
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 
+export const runtime = 'edge';
+
 export default function HomePage() {
   const cookieStore = cookies();
   const token = cookieStore.get('bitacora_token')?.value || cookieStore.get('token')?.value;
