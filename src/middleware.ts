@@ -1,5 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+function parseJwt(token: string) {
+  try {
+    const parts = token.split('.');
+    if (parts.length >= 2) {
+      const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+      return JSON.parse(atob(base64));
+    }
+  } catch (_) {}
+  return null;
+}
+
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
@@ -32,16 +43,13 @@ export function middleware(request: NextRequest) {
     if (pathname === '/login') {
       const token = request.cookies.get('bitacora_token')?.value || request.cookies.get('token')?.value;
       if (token) {
-        try {
-          const parts = token.split('.');
-          if (parts.length >= 2) {
-            const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString());
-            const now = Math.floor(Date.now() / 1000);
-            if (!payload.exp || payload.exp > now) {
-              return NextResponse.redirect(new URL('/dashboard', request.url));
-            }
+        const payload = parseJwt(token);
+        if (payload) {
+          const now = Math.floor(Date.now() / 1000);
+          if (!payload.exp || payload.exp > now) {
+            return NextResponse.redirect(new URL('/dashboard', request.url));
           }
-        } catch (_) {}
+        }
       }
     }
     return NextResponse.next();
@@ -56,21 +64,17 @@ export function middleware(request: NextRequest) {
   }
 
   // Validar si el token expiró (contador de sesión)
-  try {
-    const parts = token.split('.');
-    if (parts.length >= 2) {
-      const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString());
-      const now = Math.floor(Date.now() / 1000);
+  const payload = parseJwt(token);
+  if (!payload) {
+    const response = NextResponse.redirect(new URL('/login', request.url));
+    response.cookies.delete('bitacora_token');
+    response.cookies.delete('token');
+    return response;
+  }
 
-      if (payload.exp && payload.exp < now) {
-        // Expirado: eliminar cookies y redirigir a login
-        const response = NextResponse.redirect(new URL('/login', request.url));
-        response.cookies.delete('bitacora_token');
-        response.cookies.delete('token');
-        return response;
-      }
-    }
-  } catch (_) {
+  const now = Math.floor(Date.now() / 1000);
+  if (payload.exp && payload.exp < now) {
+    // Expirado: eliminar cookies y redirigir a login
     const response = NextResponse.redirect(new URL('/login', request.url));
     response.cookies.delete('bitacora_token');
     response.cookies.delete('token');
