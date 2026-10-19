@@ -16,6 +16,7 @@ import {
   DuracionProyecto,
   DURACION_PROYECTO_DEFAULT,
   generarMesesPorDuracion,
+  MESES_NOMBRES,
 } from '@/lib/mockData';
 import { showSuccessToast } from '@/components/ui/Toast';
 import {
@@ -29,11 +30,31 @@ export default function DashboardPage() {
   const router = useRouter();
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [documentos, setDocumentos] = useState<DocumentoBitacora[]>([]);
-  const [mesSeleccionadoNum, setMesSeleccionadoNum] = useState<number | null>(null);
+  const [mesSeleccionado, setMesSeleccionado] = useState<{ mes: number; anio: number } | null>(null);
   const [anioActual, setAnioActual] = useState<number | 'todos'>('todos');
+  const [mesFiltro, setMesFiltro] = useState<number | 'todos'>('todos');
 
-  // Duración del proyecto establecida por el usuario
-  const [duracionProyecto, setDuracionProyecto] = useState<DuracionProyecto>(DURACION_PROYECTO_DEFAULT);
+  // Duración del proyecto establecida por el usuario - lazy init para evitar reset al reiniciar/recargar
+  const [duracionProyecto, setDuracionProyecto] = useState<DuracionProyecto>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const stored = localStorage.getItem('bitacora_duracion_proyecto');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (
+            parsed &&
+            typeof parsed.mesInicio === 'number' &&
+            typeof parsed.anioInicio === 'number' &&
+            typeof parsed.mesFin === 'number' &&
+            typeof parsed.anioFin === 'number'
+          ) {
+            return parsed;
+          }
+        }
+      } catch (_) {}
+    }
+    return DURACION_PROYECTO_DEFAULT;
+  });
 
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -67,16 +88,18 @@ export default function DashboardPage() {
         } catch (_) {}
       }
 
-      // Cargar duración del proyecto si existe guardada
-      const storedDuracion = localStorage.getItem('bitacora_duracion_proyecto');
-      if (storedDuracion) {
-        try {
-          const parsedDuracion = JSON.parse(storedDuracion);
-          if (parsedDuracion?.mesInicio && parsedDuracion?.anioInicio) {
-            setDuracionProyecto(parsedDuracion);
+      // Sincronizar duración guardada en servidor o cookie como respaldo
+      fetch('/api/config')
+        .then((res) => res.json())
+        .then((data) => {
+          if (data?.success && data?.duracion) {
+            setDuracionProyecto(data.duracion);
+            try {
+              localStorage.setItem('bitacora_duracion_proyecto', JSON.stringify(data.duracion));
+            } catch (_) {}
           }
-        } catch (_) {}
-      }
+        })
+        .catch(() => {});
 
       // Limpiar datos quemados antiguos del caché si existieran
       try {
@@ -114,12 +137,20 @@ export default function DashboardPage() {
 
   const esAdmin = userProfile?.rol === 'Administrador';
 
-  // Guardar nueva duración del proyecto
+  // Guardar nueva duración del proyecto (Persistente en servidor, cookie y localStorage)
   const handleGuardarDuracion = (nueva: DuracionProyecto) => {
     setDuracionProyecto(nueva);
     try {
       localStorage.setItem('bitacora_duracion_proyecto', JSON.stringify(nueva));
+      document.cookie = `bitacora_duracion_proyecto=${encodeURIComponent(
+        JSON.stringify(nueva)
+      )}; path=/; max-age=315360000; SameSite=Lax`;
     } catch (_) {}
+    fetch('/api/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(nueva),
+    }).catch(() => {});
     showSuccessToast(
       `Duración actualizada: ahora se muestran todos los meses desde inicio hasta fin de obra.`
     );
@@ -134,10 +165,15 @@ export default function DashboardPage() {
     );
   }, [duracionProyecto, documentos, anioActual]);
 
-  // Filter months according to search query and date range
+  // Filter months according to search query, month filter and date range
   const mesesFiltrados = useMemo(() => {
     return todosMeses.filter((m) => {
-      // Date filter
+      // Month dropdown filter
+      if (mesFiltro !== 'todos' && m.mes !== mesFiltro) {
+        return false;
+      }
+
+      // Date range filter
       if (fechaInicio) {
         const dInicio = new Date(fechaInicio);
         const mesFinDate = new Date(m.anio, m.mes, 0);
@@ -165,16 +201,35 @@ export default function DashboardPage() {
 
       return true;
     });
-  }, [todosMeses, fechaInicio, fechaFin, searchQuery]);
+  }, [todosMeses, mesFiltro, fechaInicio, fechaFin, searchQuery]);
 
-  const mesActivoObj = useMemo(() => {
-    if (mesSeleccionadoNum === null) return null;
-    return (
-      todosMeses.find((m) => m.mes === mesSeleccionadoNum) ||
-      generarMesesPorDuracion(duracionProyecto, documentos).find((m) => m.mes === mesSeleccionadoNum) ||
-      null
-    );
-  }, [todosMeses, mesSeleccionadoNum, duracionProyecto, documentos]);
+  // Safe month info object that NEVER crashes or returns null when a month is selected
+  const mesActivoObj = useMemo<MesInfo | null>(() => {
+    if (!mesSeleccionado) return null;
+    const { mes, anio } = mesSeleccionado;
+
+    // 1. Try finding in current filtered list
+    const match1 = todosMeses.find((m) => m.mes === mes && m.anio === anio);
+    if (match1) return match1;
+
+    // 2. Try finding across all months in duration
+    const allMeses = generarMesesPorDuracion(duracionProyecto, documentos);
+    const match2 = allMeses.find((m) => m.mes === mes && m.anio === anio);
+    if (match2) return match2;
+
+    // 3. Fallback object so the application never throws client-side exception
+    const nombreMes = MESES_NOMBRES[mes - 1] || 'Mes';
+    const docs = documentos.filter((d) => d.mes === mes && d.anio === anio);
+    return {
+      mes,
+      anio,
+      nombre: `${nombreMes} ${anio}`,
+      nombreMes,
+      totalDias: new Date(anio, mes, 0).getDate(),
+      diasConDocumentos: new Set(docs.map((d) => d.dia)).size,
+      documentos: docs,
+    };
+  }, [todosMeses, mesSeleccionado, duracionProyecto, documentos]);
 
   // Handler for uploading new document
   const handleDocumentoSubido = (nuevoDoc: DocumentoBitacora) => {
@@ -206,15 +261,16 @@ export default function DashboardPage() {
 
   const handleSubirParaDia = (dia: number) => {
     setDiaSugeridoParaSubir(dia);
-    if (mesSeleccionadoNum) {
-      setMesSugeridoParaSubir(mesSeleccionadoNum);
-    }
     if (mesActivoObj) {
+      setMesSugeridoParaSubir(mesActivoObj.mes);
       setAnioSugeridoParaSubir(mesActivoObj.anio);
-    } else if (typeof anioActual === 'number') {
-      setAnioSugeridoParaSubir(anioActual);
+    } else if (mesSeleccionado) {
+      setMesSugeridoParaSubir(mesSeleccionado.mes);
+      setAnioSugeridoParaSubir(mesSeleccionado.anio);
     } else {
-      setAnioSugeridoParaSubir(duracionProyecto.anioInicio);
+      const hoy = new Date();
+      setMesSugeridoParaSubir(hoy.getMonth() + 1);
+      setAnioSugeridoParaSubir(hoy.getFullYear());
     }
     setModalSubirAbierto(true);
   };
@@ -274,22 +330,24 @@ export default function DashboardPage() {
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         userProfile={userProfile}
-        onVolverInicio={() => setMesSeleccionadoNum(null)}
+        onVolverInicio={() => setMesSeleccionado(null)}
       />
 
       {/* Main Body Content */}
       <main className="flex-1 w-full max-w-7xl mx-auto p-3 sm:p-5 lg:p-6">
-        {mesSeleccionadoNum === null ? (
+        {mesSeleccionado === null ? (
           /* VISTA 1: MESES */
           <VistaMeses
             meses={mesesFiltrados}
             anioActual={anioActual}
             onAnioChange={setAnioActual}
+            mesFiltro={mesFiltro}
+            onMesFiltroChange={setMesFiltro}
             onSeleccionarMes={(mesNum, anio) => {
-              setMesSeleccionadoNum(mesNum);
-              if (anio && typeof anioActual === 'number' && anioActual !== anio) {
-                setAnioActual(anio);
-              }
+              const anioFinal =
+                anio ||
+                (typeof anioActual === 'number' ? anioActual : duracionProyecto.anioInicio);
+              setMesSeleccionado({ mes: mesNum, anio: anioFinal });
             }}
             esAdmin={esAdmin}
             onAbrirSubida={() => {
@@ -306,6 +364,9 @@ export default function DashboardPage() {
             onLimpiarFiltros={() => {
               setFechaInicio('');
               setFechaFin('');
+              setMesFiltro('todos');
+              setAnioActual('todos');
+              setSearchQuery('');
             }}
             duracionProyecto={duracionProyecto}
             onGuardarDuracion={handleGuardarDuracion}
@@ -316,12 +377,12 @@ export default function DashboardPage() {
             <VistaDias
               mesInfo={mesActivoObj}
               todosLosMeses={generarMesesPorDuracion(duracionProyecto, documentos)}
-              onVolverAMeses={() => setMesSeleccionadoNum(null)}
+              onVolverAMeses={() => setMesSeleccionado(null)}
               onCambiarMes={(nuevoMes, nuevoAnio) => {
-                setMesSeleccionadoNum(nuevoMes);
-                if (nuevoAnio && typeof anioActual === 'number') {
-                  setAnioActual(nuevoAnio);
-                }
+                setMesSeleccionado({
+                  mes: nuevoMes,
+                  anio: nuevoAnio || mesActivoObj.anio,
+                });
               }}
               onVerDocumento={(doc) => setDocumentoParaVer(doc)}
               onEditarDocumento={(doc) => setDocumentoParaEditar(doc)}
@@ -376,11 +437,17 @@ export default function DashboardPage() {
       <CargaMultipleDrawer
         isOpen={modalCargaMultipleAbierto}
         onClose={() => setModalCargaMultipleAbierto(false)}
-        mesActual={mesActivoObj?.mes || (typeof mesSeleccionadoNum === 'number' ? mesSeleccionadoNum : new Date().getMonth() + 1)}
-        anioActual={mesActivoObj?.anio || (typeof anioActual === 'number' ? anioActual : new Date().getFullYear())}
+        mesActual={
+          mesActivoObj?.mes ||
+          (mesSeleccionado ? mesSeleccionado.mes : new Date().getMonth() + 1)
+        }
+        anioActual={
+          mesActivoObj?.anio ||
+          (mesSeleccionado ? mesSeleccionado.anio : new Date().getFullYear())
+        }
         usuarioNombre={userProfile?.nombre || 'Administrador'}
         onDocumentosSubidos={handleDocumentosMultiplesSubidos}
-        mesBloqueado={mesSeleccionadoNum !== null}
+        mesBloqueado={mesSeleccionado !== null}
         documentosExistentes={documentos}
       />
     </div>

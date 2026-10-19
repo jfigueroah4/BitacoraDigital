@@ -157,16 +157,50 @@ export default function LoginPage() {
     setIsSubmitting(true);
 
     try {
-      const userTrim = username.trim().toLowerCase();
+      const cleanUser = userTrim.startsWith('@') ? userTrim.substring(1) : userTrim;
       const passTrim = password.trim();
 
       let authUser: UserProfile | null = null;
+      let emailParaAuth = userTrim.includes('@') && userTrim.includes('.') ? userTrim : '';
 
-      // 1. Intentar inicio de sesión en Supabase Auth si es un correo
-      if (supabase && userTrim.includes('@')) {
+      // Buscar si el texto ingresado corresponde al username de un usuario guardado
+      let listUsuarios: any[] = [];
+      try {
+        const stored = localStorage.getItem('bitacora_usuarios_lista');
+        if (stored) listUsuarios = JSON.parse(stored);
+      } catch (_) {}
+
+      const usuarioPorUsername = listUsuarios.find(
+        (u: any) =>
+          (u.username && u.username.toLowerCase() === cleanUser) ||
+          (u.correo && u.correo.toLowerCase() === userTrim) ||
+          (u.nombre && u.nombre.toLowerCase() === cleanUser)
+      );
+
+      if (usuarioPorUsername && usuarioPorUsername.correo) {
+        emailParaAuth = usuarioPorUsername.correo.toLowerCase();
+      }
+
+      // Si no se encontró localmente y es un username, consultar en Supabase
+      if (!emailParaAuth && !userTrim.includes('@') && supabase) {
+        try {
+          const { data: dbPerfil } = await supabase
+            .from('perfil_usuario')
+            .select('*, usuario(*)')
+            .eq('username', cleanUser)
+            .maybeSingle();
+
+          if (dbPerfil?.usuario?.correo || dbPerfil?.correo) {
+            emailParaAuth = (dbPerfil.usuario?.correo || dbPerfil.correo).toLowerCase();
+          }
+        } catch (_) {}
+      }
+
+      // 1. Intentar inicio de sesión en Supabase Auth (por correo directo o correo resuelto del username)
+      if (supabase && emailParaAuth) {
         try {
           const { data: authRes, error: sbError } = await supabase.auth.signInWithPassword({
-            email: userTrim,
+            email: emailParaAuth,
             password: passTrim,
           });
 
@@ -185,7 +219,7 @@ export default function LoginPage() {
                 `${perfilData?.primer_nombre || ''} ${perfilData?.primer_apellido || ''}`.trim() ||
                 authRes.user.email ||
                 'Usuario',
-              email: authRes.user.email || userTrim,
+              email: authRes.user.email || emailParaAuth,
               rol: rolNombre === 'Administrador' ? 'Administrador' : 'Usuario',
               cargo:
                 perfilData?.cargo_puesto ||
@@ -201,8 +235,8 @@ export default function LoginPage() {
         const matchedQuick = ACCESOS_RAPIDOS.find(
           (a) =>
             (a.email.toLowerCase() === userTrim ||
-              a.id.toLowerCase() === userTrim ||
-              a.name.toLowerCase() === userTrim) &&
+              a.id.toLowerCase() === cleanUser ||
+              a.name.toLowerCase() === cleanUser) &&
             a.password === passTrim
         );
 
@@ -217,35 +251,26 @@ export default function LoginPage() {
                 ? 'Administrador de Proyecto'
                 : 'Supervisor de Obra',
           };
-        } else {
-          // Validar contra usuarios guardados
-          let list: any[] = [];
-          try {
-            const stored = localStorage.getItem('bitacora_usuarios_lista');
-            if (stored) list = JSON.parse(stored);
-          } catch (_) {}
+        } else if (usuarioPorUsername) {
+          // Validar contraseña de usuario registrado por username o correo
+          const passwordValida = usuarioPorUsername.password
+            ? usuarioPorUsername.password === passTrim
+            : passTrim === 'mariobros25';
 
-          const foundUser = list.find(
-            (u: any) =>
-              (u.correo?.toLowerCase() === userTrim ||
-                u.username?.toLowerCase() === userTrim ||
-                u.nombre?.toLowerCase() === userTrim) &&
-              (u.password ? u.password === passTrim : passTrim === 'mariobros25')
-          );
-
-          if (foundUser) {
-            if (foundUser.estado === 'Inactivo') {
+          if (passwordValida) {
+            if (usuarioPorUsername.estado === 'Inactivo') {
               showErrorToast('Su cuenta se encuentra inactiva. Contacte al administrador.');
               setIsSubmitting(false);
               return;
             }
             authUser = {
-              id: foundUser.id,
+              id: usuarioPorUsername.id,
               nombre:
-                foundUser.nombre || `${foundUser.primer_nombre} ${foundUser.primer_apellido}`,
-              email: foundUser.correo,
-              rol: foundUser.rol === 'Administrador' ? 'Administrador' : 'Usuario',
-              cargo: foundUser.cargo || 'Supervisor de Campo',
+                usuarioPorUsername.nombre ||
+                `${usuarioPorUsername.primer_nombre || ''} ${usuarioPorUsername.primer_apellido || ''}`.trim(),
+              email: usuarioPorUsername.correo,
+              rol: usuarioPorUsername.rol === 'Administrador' ? 'Administrador' : 'Usuario',
+              cargo: usuarioPorUsername.cargo || 'Supervisor de Campo',
             };
           }
         }
@@ -351,19 +376,16 @@ export default function LoginPage() {
 
   return (
     <div
-      className="relative min-h-screen w-full overflow-hidden bg-[#140B07]"
+      className="fixed inset-0 w-full h-[100dvh] overflow-hidden overscroll-none flex flex-col items-center justify-center bg-[#140B07]"
       style={{
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
         fontFamily: "'Poppins', sans-serif",
+        touchAction: 'manipulation',
       }}
     >
-      {/* Fondo de alta resolución precargado con máxima prioridad y aceleración por GPU */}
+      {/* Fondo de alta resolución precargado con máxima prioridad y fijado al viewport */}
       <div
         aria-hidden="true"
-        className="absolute inset-0 overflow-hidden pointer-events-none select-none"
+        className="fixed inset-0 overflow-hidden pointer-events-none select-none z-0"
       >
         <Image
           src="/img.jpg"
@@ -372,7 +394,7 @@ export default function LoginPage() {
           priority
           sizes="100vw"
           quality={85}
-          className="object-cover object-[center_40%] pointer-events-none"
+          className="object-cover object-center pointer-events-none"
         />
         {/* Capa de contraste oscuro para máxima nitidez y legibilidad */}
         <div className="absolute inset-0 bg-black/45 pointer-events-none" />

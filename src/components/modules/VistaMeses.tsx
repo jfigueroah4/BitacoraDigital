@@ -23,6 +23,8 @@ interface VistaMesesProps {
   meses: MesInfo[];
   anioActual: number | 'todos';
   onAnioChange?: (val: number | 'todos') => void;
+  mesFiltro?: number | 'todos';
+  onMesFiltroChange?: (val: number | 'todos') => void;
   onSeleccionarMes: (mesNum: number, anio?: number) => void;
   esAdmin: boolean;
   onAbrirSubida: () => void;
@@ -35,7 +37,10 @@ interface VistaMesesProps {
   onGuardarDuracion: (nueva: DuracionProyecto) => void;
 }
 
-const ANIOS_DISPONIBLES = [2024, 2025, 2026, 2027, 2028, 2029, 2030, 2031, 2032, 2033, 2034, 2035, 2036];
+const ANIOS_DISPONIBLES = [
+  2020, 2021, 2022, 2023, 2024, 2025, 2026, 2027, 2028, 2029,
+  2030, 2031, 2032, 2033, 2034, 2035, 2036, 2037, 2038, 2039, 2040, 2041, 2042, 2043, 2044, 2045
+];
 
 /**
  * Combobox interactivo para Mes: Permite escribir o seleccionar entre los 12 meses
@@ -286,6 +291,8 @@ export default function VistaMeses({
   meses,
   anioActual,
   onAnioChange,
+  mesFiltro = 'todos',
+  onMesFiltroChange,
   onSeleccionarMes,
   esAdmin,
   onAbrirSubida,
@@ -297,7 +304,14 @@ export default function VistaMeses({
   duracionProyecto,
   onGuardarDuracion,
 }: VistaMesesProps) {
+  const [mostrarFiltrosMobile, setMostrarFiltrosMobile] = useState(false);
   const hayFiltrosFecha = Boolean(fechaInicio || fechaFin);
+  const hayFiltrosActivos = Boolean(
+    fechaInicio ||
+    fechaFin ||
+    anioActual !== 'todos' ||
+    (mesFiltro && mesFiltro !== 'todos')
+  );
 
   // Portal mount check
   const [mounted, setMounted] = useState(false);
@@ -399,80 +413,147 @@ export default function VistaMeses({
           </div>
         </div>
 
-        {/* Fila 2: Rango de fechas con el selector de Año a la par, y botón Subir Documento a la derecha */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          {/* Lado izquierdo: Filtrar por rango + Selector de Año a la par */}
-          <div className="flex flex-wrap items-center gap-2.5">
-            <div className="flex items-center gap-1.5 text-xs font-bold text-gray-700">
-              <Filter size={14} className="text-[#3B2219]" />
-              <span>Filtrar por rango:</span>
-            </div>
-
-            <div className="flex items-center gap-2 flex-wrap">
-              <div className="flex items-center gap-1.5 bg-white border border-gray-200 rounded-lg px-2.5 py-1 shadow-2xs">
-                <span className="text-[10px] font-bold text-gray-400 uppercase">Inicio:</span>
-                <input
-                  type="date"
-                  value={fechaInicio}
-                  onChange={(e) => onFechaInicioChange(e.target.value)}
-                  className="bg-transparent text-xs text-gray-800 outline-none font-medium"
-                />
-              </div>
-
-              <div className="flex items-center gap-1.5 bg-white border border-gray-200 rounded-lg px-2.5 py-1 shadow-2xs">
-                <span className="text-[10px] font-bold text-gray-400 uppercase">Fin:</span>
-                <input
-                  type="date"
-                  value={fechaFin}
-                  onChange={(e) => onFechaFinChange(e.target.value)}
-                  className="bg-transparent text-xs text-gray-800 outline-none font-medium"
-                />
-              </div>
-
-              {hayFiltrosFecha && (
-                <button
-                  type="button"
-                  onClick={onLimpiarFiltros}
-                  className="text-xs text-[#3B2219] hover:underline font-semibold px-2 py-1 cursor-pointer"
-                >
-                  Limpiar fechas
-                </button>
-              )}
-
-              {/* Selector de Años a la par de los filtros */}
-              <div className="flex items-center gap-1.5 bg-white border border-gray-200 rounded-lg px-2.5 py-1 shadow-2xs ml-1">
-                <span className="text-[10px] font-bold text-gray-400 uppercase">Año:</span>
-                <select
-                  value={anioActual}
-                  onChange={(e) => {
-                    const val = e.target.value === 'todos' ? 'todos' : Number(e.target.value);
-                    onAnioChange?.(val);
-                    setPaginaActual(1);
-                  }}
-                  className="bg-transparent text-xs font-bold text-gray-900 outline-none cursor-pointer"
-                >
-                  <option value="todos">Todos los meses</option>
-                  {ANIOS_DISPONIBLES.map((a) => (
-                    <option key={a} value={a}>
-                      {a}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-          </div>
-
-          {/* Lado derecho: Botón Subir Documento */}
-          {esAdmin && (
+        {/* Fila 2: En mobile botón toggle para filtros estilo DomunNet y en Desktop barra completa */}
+        <div className="flex flex-col gap-2.5">
+          {/* Barra superior de acción en Mobile */}
+          <div className="flex sm:hidden items-center justify-between gap-2">
             <button
               type="button"
-              onClick={onAbrirSubida}
-              className="inline-flex items-center justify-center gap-2 bg-[#3B2219] hover:bg-[#2A1710] text-white text-xs font-bold px-4 py-2 rounded-xl shadow-2xs transition-colors duration-200 cursor-pointer shrink-0"
+              onClick={() => setMostrarFiltrosMobile(!mostrarFiltrosMobile)}
+              className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-bold transition-all shadow-2xs cursor-pointer ${
+                hayFiltrosActivos
+                  ? 'bg-[#3B2219] text-white border-[#3B2219]'
+                  : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
+              }`}
             >
-              <Plus size={15} strokeWidth={2.5} />
-              <span>Subir Documento</span>
+              <Filter size={13} />
+              <span>Filtrar por rango</span>
+              {hayFiltrosActivos && (
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+              )}
             </button>
-          )}
+
+            {esAdmin && (
+              <button
+                type="button"
+                onClick={onAbrirSubida}
+                className="inline-flex items-center gap-1.5 bg-[#3B2219] hover:bg-[#2A1710] text-white text-xs font-bold px-3.5 py-2 rounded-xl shadow-2xs transition-colors cursor-pointer"
+              >
+                <Plus size={15} strokeWidth={2.5} />
+                <span>Subir Documento</span>
+              </button>
+            )}
+          </div>
+
+          {/* Panel de Filtros: Desplegable en mobile y siempre visible en Desktop */}
+          <div
+            className={`${
+              mostrarFiltrosMobile ? 'flex flex-col' : 'hidden sm:flex'
+            } sm:flex-row sm:items-center justify-between gap-3 bg-white sm:bg-transparent p-3 sm:p-0 rounded-2xl sm:rounded-none border sm:border-none border-gray-200 shadow-2xs sm:shadow-none transition-all`}
+          >
+            {/* Controles de Filtros */}
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 flex-wrap">
+              <div className="hidden sm:flex items-center gap-1.5 text-xs font-bold text-gray-700">
+                <Filter size={14} className="text-[#3B2219]" />
+                <span>Filtrar por rango:</span>
+              </div>
+
+              {/* Rango de Fechas: Inicio y Fin */}
+              <div className="grid grid-cols-2 sm:flex sm:items-center gap-2">
+                <div className="flex items-center gap-1.5 bg-gray-50 sm:bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 sm:py-1 shadow-2xs">
+                  <span className="text-[10px] font-bold text-gray-400 uppercase">Inicio:</span>
+                  <input
+                    type="date"
+                    value={fechaInicio}
+                    onChange={(e) => onFechaInicioChange(e.target.value)}
+                    className="bg-transparent text-xs text-gray-800 outline-none font-medium w-full"
+                  />
+                </div>
+
+                <div className="flex items-center gap-1.5 bg-gray-50 sm:bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 sm:py-1 shadow-2xs">
+                  <span className="text-[10px] font-bold text-gray-400 uppercase">Fin:</span>
+                  <input
+                    type="date"
+                    value={fechaFin}
+                    onChange={(e) => onFechaFinChange(e.target.value)}
+                    className="bg-transparent text-xs text-gray-800 outline-none font-medium w-full"
+                  />
+                </div>
+              </div>
+
+              {/* Selectores de Mes y Año */}
+              <div className="grid grid-cols-2 sm:flex sm:items-center gap-2">
+                {/* Selector de Mes */}
+                <div className="flex items-center gap-1.5 bg-gray-50 sm:bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 sm:py-1 shadow-2xs">
+                  <span className="text-[10px] font-bold text-gray-400 uppercase">Mes:</span>
+                  <select
+                    value={mesFiltro ?? 'todos'}
+                    onChange={(e) => {
+                      const val = e.target.value === 'todos' ? 'todos' : Number(e.target.value);
+                      onMesFiltroChange?.(val);
+                      setPaginaActual(1);
+                    }}
+                    className="bg-transparent text-xs font-bold text-gray-900 outline-none cursor-pointer w-full"
+                  >
+                    <option value="todos">Todos los meses</option>
+                    {MESES_NOMBRES.map((nombre, idx) => (
+                      <option key={idx} value={idx + 1}>
+                        {nombre}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Selector de Años con amplia lista de años */}
+                <div className="flex items-center gap-1.5 bg-gray-50 sm:bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 sm:py-1 shadow-2xs">
+                  <span className="text-[10px] font-bold text-gray-400 uppercase">Año:</span>
+                  <select
+                    value={anioActual}
+                    onChange={(e) => {
+                      const val = e.target.value === 'todos' ? 'todos' : Number(e.target.value);
+                      onAnioChange?.(val);
+                      setPaginaActual(1);
+                    }}
+                    className="bg-transparent text-xs font-bold text-gray-900 outline-none cursor-pointer w-full"
+                  >
+                    <option value="todos">Todos los años</option>
+                    {ANIOS_DISPONIBLES.map((a) => (
+                      <option key={a} value={a}>
+                        {a}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Botón Limpiar Filtros */}
+              {hayFiltrosActivos && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onLimpiarFiltros();
+                    onAnioChange?.('todos');
+                    onMesFiltroChange?.('todos');
+                  }}
+                  className="text-xs text-[#3B2219] hover:underline font-semibold px-2 py-1 cursor-pointer"
+                >
+                  Limpiar filtros
+                </button>
+              )}
+            </div>
+
+            {/* Lado derecho en Desktop: Botón Subir Documento */}
+            {esAdmin && (
+              <button
+                type="button"
+                onClick={onAbrirSubida}
+                className="hidden sm:inline-flex items-center justify-center gap-2 bg-[#3B2219] hover:bg-[#2A1710] text-white text-xs font-bold px-4 py-2 rounded-xl shadow-2xs transition-colors duration-200 cursor-pointer shrink-0"
+              >
+                <Plus size={15} strokeWidth={2.5} />
+                <span>Subir Documento</span>
+              </button>
+            )}
+          </div>
         </div>
       </div>
 

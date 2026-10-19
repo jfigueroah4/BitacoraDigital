@@ -121,15 +121,15 @@ export default function VistaDias({
             </div>
           </div>
 
-          {/* Month selector & Search disminuido de tamaño */}
-          <div className="flex items-center gap-2 flex-wrap">
+          {/* Month selector & Search / Actions responsive */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full lg:w-auto">
             {/* Quick Month Switcher con meses donde ya hayan registros */}
-            <div className="flex items-center gap-1.5 bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1">
-              <Calendar size={13} className="text-[#3B2219]" />
+            <div className="flex items-center gap-1.5 bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 w-full sm:w-auto">
+              <Calendar size={13} className="text-[#3B2219] shrink-0" />
               <select
                 value={`${mesInfo.anio}-${mesInfo.mes}`}
                 onChange={(e) => handleSelectMes(e.target.value)}
-                className="bg-transparent text-xs font-bold text-gray-800 outline-none cursor-pointer max-w-[190px]"
+                className="bg-transparent text-xs font-bold text-gray-800 outline-none cursor-pointer w-full sm:max-w-[190px]"
               >
                 {mesesConRegistros.length > 0 ? (
                   <>
@@ -168,51 +168,55 @@ export default function VistaDias({
               </select>
             </div>
 
-            {/* Dia search */}
-            <div className="flex items-center gap-1.5 bg-gray-100 rounded-lg px-2.5 py-1 h-[32px]">
-              <Search size={13} className="text-gray-400" />
-              <input
-                type="text"
-                placeholder="Filtrar por día o folio..."
-                value={filtroDiaTexto}
-                onChange={(e) => setFiltroDiaTexto(e.target.value)}
-                className="bg-transparent outline-none text-[11px] text-gray-800 placeholder-gray-400 w-32 sm:w-40 font-medium"
-              />
-              {filtroDiaTexto && (
-                <button
-                  type="button"
-                  onClick={() => setFiltroDiaTexto('')}
-                  className="text-gray-400 hover:text-gray-700 text-xs"
-                >
-                  &times;
-                </button>
-              )}
-            </div>
-
-            {esAdmin && (
-              <div className="flex items-center gap-2">
-                {onAbrirCargaMultiple && (
+            {/* Row of Search and Action Buttons */}
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              {/* Dia search */}
+              <div className="flex-1 sm:flex-initial flex items-center gap-1.5 bg-gray-100 rounded-lg px-2.5 py-1 h-[34px]">
+                <Search size={13} className="text-gray-400 shrink-0" />
+                <input
+                  type="text"
+                  placeholder="Filtrar por día o folio..."
+                  value={filtroDiaTexto}
+                  onChange={(e) => setFiltroDiaTexto(e.target.value)}
+                  className="bg-transparent outline-none text-[11px] text-gray-800 placeholder-gray-400 w-full sm:w-36 font-medium"
+                />
+                {filtroDiaTexto && (
                   <button
                     type="button"
-                    onClick={onAbrirCargaMultiple}
-                    className="inline-flex items-center gap-1.5 bg-white border border-gray-200 hover:border-[#3B2219] hover:bg-[#F4ECE6]/50 text-gray-800 text-xs font-bold px-3 py-1.5 rounded-lg shadow-2xs transition-all cursor-pointer"
-                    title="Subir varios archivos en lote para diferentes fechas"
+                    onClick={() => setFiltroDiaTexto('')}
+                    className="text-gray-400 hover:text-gray-700 text-xs shrink-0"
                   >
-                    <Files size={14} className="text-[#3B2219]" strokeWidth={2.3} />
-                    <span className="hidden sm:inline">Carga Múltiple</span>
+                    &times;
                   </button>
                 )}
-
-                <button
-                  type="button"
-                  onClick={() => onSubirParaDia(new Date().getDate())}
-                  className="inline-flex items-center gap-1.5 bg-[#3B2219] hover:bg-[#2A1710] text-white text-xs font-bold px-3 py-1.5 rounded-lg shadow-2xs transition-colors duration-200 cursor-pointer"
-                >
-                  <Plus size={14} strokeWidth={2.5} />
-                  <span className="hidden sm:inline">Subir para este mes</span>
-                </button>
               </div>
-            )}
+
+              {esAdmin && (
+                <div className="flex items-center gap-1.5 shrink-0">
+                  {onAbrirCargaMultiple && (
+                    <button
+                      type="button"
+                      onClick={onAbrirCargaMultiple}
+                      className="inline-flex items-center justify-center gap-1.5 bg-white border border-gray-200 hover:border-[#3B2219] hover:bg-[#F4ECE6]/50 text-gray-800 text-xs font-bold h-[34px] px-2.5 sm:px-3 rounded-lg shadow-2xs transition-all cursor-pointer"
+                      title="Subir varios archivos en lote para diferentes fechas"
+                    >
+                      <Files size={14} className="text-[#3B2219]" strokeWidth={2.3} />
+                      <span className="hidden sm:inline">Carga Múltiple</span>
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => onSubirParaDia(new Date().getDate())}
+                    className="inline-flex items-center justify-center gap-1.5 bg-[#3B2219] hover:bg-[#2A1710] text-white text-xs font-bold h-[34px] px-2.5 sm:px-3 rounded-lg shadow-2xs transition-colors duration-200 cursor-pointer"
+                    title="Subir para este mes"
+                  >
+                    <Plus size={14} strokeWidth={2.5} />
+                    <span className="hidden sm:inline">Subir para este mes</span>
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
