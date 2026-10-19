@@ -124,6 +124,21 @@ export default function LoginPage() {
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
+    // 0. Verificar bloqueo por intentos fallidos (1 hora)
+    try {
+      const storedLock = localStorage.getItem('bitacora_failed_login_attempts');
+      if (storedLock) {
+        const { lockUntil } = JSON.parse(storedLock);
+        if (lockUntil && Date.now() < lockUntil) {
+          const minRest = Math.ceil((lockUntil - Date.now()) / (60 * 1000));
+          showErrorToast(
+            `Demasiados intentos fallidos. Su cuenta está bloqueada temporalmente durante 1 hora (${minRest} min restantes).`
+          );
+          return;
+        }
+      }
+    } catch (_) {}
+
     if (!username.trim() || !password.trim()) {
       if (!username.trim()) setEmailError(true);
       if (!password.trim()) setPasswordError(true);
@@ -134,88 +149,170 @@ export default function LoginPage() {
     setIsSubmitting(true);
 
     try {
+      const userTrim = username.trim().toLowerCase();
+      const passTrim = password.trim();
+
+      let authUser: UserProfile | null = null;
+
       // 1. Intentar inicio de sesión en Supabase Auth si es un correo
-      let supabaseProfile: UserProfile | null = null;
-      if (supabase && username.includes('@')) {
+      if (supabase && userTrim.includes('@')) {
         try {
-          const { data: authRes } = await supabase.auth.signInWithPassword({
-            email: username.trim(),
-            password,
+          const { data: authRes, error: sbError } = await supabase.auth.signInWithPassword({
+            email: userTrim,
+            password: passTrim,
           });
 
-          if (authRes?.user) {
+          if (authRes?.user && !sbError) {
             const { data: perfilData } = await supabase
               .from('perfil_usuario')
               .select('*, usuario(*, rol(*))')
               .eq('usuario_id', authRes.user.id)
               .maybeSingle();
 
-            if (perfilData) {
-              const rolNombre = perfilData.usuario?.rol?.nombre_rol || 'Usuario';
-              supabaseProfile = {
-                id: authRes.user.id,
-                nombre: perfilData.nombre_completo || `${perfilData.primer_nombre} ${perfilData.primer_apellido}`,
-                email: authRes.user.email || username.trim(),
-                rol: rolNombre === 'Administrador' ? 'Administrador' : 'Usuario',
-                cargo: perfilData.cargo_puesto || 'Administrador de Proyecto',
-              };
-            }
+            const rolNombre = perfilData?.usuario?.rol?.nombre_rol || 'Usuario';
+            authUser = {
+              id: authRes.user.id,
+              nombre:
+                perfilData?.nombre_completo ||
+                `${perfilData?.primer_nombre || ''} ${perfilData?.primer_apellido || ''}`.trim() ||
+                authRes.user.email ||
+                'Usuario',
+              email: authRes.user.email || userTrim,
+              rol: rolNombre === 'Administrador' ? 'Administrador' : 'Usuario',
+              cargo:
+                perfilData?.cargo_puesto ||
+                (rolNombre === 'Administrador' ? 'Administrador de Proyecto' : 'Supervisor de Campo'),
+            };
           }
         } catch (_) {}
       }
 
-      // 2. Determinar rol y perfil según Supabase, Usuarios Registrados o Accesos Rápidos
-      let registeredUser: any = null;
-      try {
-        const storedUsers = localStorage.getItem('bitacora_usuarios_lista');
-        if (storedUsers) {
-          const list = JSON.parse(storedUsers);
-          if (Array.isArray(list)) {
-            registeredUser = list.find(
-              (u: any) =>
-                (u.username && u.username.toLowerCase() === username.trim().toLowerCase()) ||
-                (u.correo && u.correo.toLowerCase() === username.trim().toLowerCase())
-            );
+      // 2. Validar con Accesos Rápidos y Usuarios Registrados
+      if (!authUser) {
+        // Validar contra ACCESOS_RAPIDOS
+        const matchedQuick = ACCESOS_RAPIDOS.find(
+          (a) =>
+            (a.email.toLowerCase() === userTrim ||
+              a.id.toLowerCase() === userTrim ||
+              a.name.toLowerCase() === userTrim) &&
+            a.password === passTrim
+        );
+
+        if (matchedQuick) {
+          authUser = {
+            id: matchedQuick.id,
+            nombre: matchedQuick.name,
+            email: matchedQuick.email,
+            rol: matchedQuick.role,
+            cargo:
+              matchedQuick.role === 'Administrador'
+                ? 'Administrador de Proyecto'
+                : 'Supervisor de Obra',
+          };
+        } else {
+          // Validar contra usuarios guardados
+          let list: any[] = [];
+          try {
+            const stored = localStorage.getItem('bitacora_usuarios_lista');
+            if (stored) list = JSON.parse(stored);
+          } catch (_) {}
+
+          const foundUser = list.find(
+            (u: any) =>
+              (u.correo?.toLowerCase() === userTrim ||
+                u.username?.toLowerCase() === userTrim ||
+                u.nombre?.toLowerCase() === userTrim) &&
+              (u.password ? u.password === passTrim : passTrim === 'mariobros25')
+          );
+
+          if (foundUser) {
+            if (foundUser.estado === 'Inactivo') {
+              showErrorToast('Su cuenta se encuentra inactiva. Contacte al administrador.');
+              setIsSubmitting(false);
+              return;
+            }
+            authUser = {
+              id: foundUser.id,
+              nombre:
+                foundUser.nombre || `${foundUser.primer_nombre} ${foundUser.primer_apellido}`,
+              email: foundUser.correo,
+              rol: foundUser.rol === 'Administrador' ? 'Administrador' : 'Usuario',
+              cargo: foundUser.cargo || 'Supervisor de Campo',
+            };
           }
         }
-      } catch (_) {}
+      }
 
-      const foundQuick = ACCESOS_RAPIDOS.find(
-        (a) =>
-          a.email.toLowerCase() === username.trim().toLowerCase() ||
-          a.id === username.trim().toLowerCase() ||
-          (registeredUser && a.email.toLowerCase() === registeredUser.correo?.toLowerCase())
+      // 3. Si NO se validaron las credenciales, BLOQUEAR ACCESO (como en DomunNet)
+      if (!authUser) {
+        setEmailError(true);
+        setPasswordError(true);
+
+        let attempts = 1;
+        let lockUntil: number | null = null;
+        try {
+          const stored = localStorage.getItem('bitacora_failed_login_attempts');
+          if (stored) {
+            const parsed = JSON.parse(stored);
+            if (parsed.lockUntil && Date.now() >= parsed.lockUntil) {
+              attempts = 1;
+            } else {
+              attempts = (parsed.attempts || 0) + 1;
+            }
+          }
+        } catch {
+          attempts = 1;
+        }
+
+        if (attempts >= 5) {
+          lockUntil = Date.now() + 3600 * 1000; // 1 hora de bloqueo
+          localStorage.setItem(
+            'bitacora_failed_login_attempts',
+            JSON.stringify({ attempts, lockUntil })
+          );
+          showErrorToast(
+            'Demasiados intentos fallidos. Su cuenta está bloqueada temporalmente durante 1 hora.'
+          );
+        } else {
+          localStorage.setItem(
+            'bitacora_failed_login_attempts',
+            JSON.stringify({ attempts, lockUntil: null })
+          );
+          showErrorToast(`Credenciales incorrectas. Intento ${attempts} de 5.`);
+        }
+
+        setIsSubmitting(false);
+        return;
+      }
+
+      // 4. Credenciales correctas: limpiar intentos fallidos
+      localStorage.removeItem('bitacora_failed_login_attempts');
+
+      // Generar token JWT con contador de expiración (8 horas = 28800s)
+      const expSeconds = Math.floor(Date.now() / 1000) + 28800;
+      const headerStr = btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
+      const payloadStr = btoa(
+        JSON.stringify({
+          id: authUser.id,
+          email: authUser.email,
+          rol: authUser.rol,
+          exp: expSeconds,
+        })
       );
+      const sessionToken = `${headerStr}.${payloadStr}.sig`;
 
-      const rolDeterminado: UserRole =
-        supabaseProfile?.rol ||
-        (registeredUser?.rol === 'Administrador' ? 'Administrador' : registeredUser ? 'Usuario' : undefined) ||
-        foundQuick?.role ||
-        (username.toLowerCase().includes('admin') ? 'Administrador' : 'Usuario');
-
-      const userProfile: UserProfile = supabaseProfile || {
-        id: registeredUser?.id || foundQuick?.id || `user-${Date.now()}`,
-        nombre:
-          registeredUser?.nombre ||
-          foundQuick?.name ||
-          (rolDeterminado === 'Administrador' ? 'Daniel Figueroa' : 'Usuario Sistema'),
-        email: registeredUser?.correo || foundQuick?.email || username.trim(),
-        rol: rolDeterminado,
-        cargo:
-          registeredUser?.cargo ||
-          (rolDeterminado === 'Administrador' ? 'Administrador de Proyecto' : 'Supervisor de Campo'),
-      };
-
-      // Guardar sesión
-      localStorage.setItem('bitacora_user_profile', JSON.stringify(userProfile));
-      document.cookie = `bitacora_token=token_${Date.now()}; path=/; max-age=28800; SameSite=Lax`;
+      // Guardar cookies y perfil
+      document.cookie = `bitacora_token=${sessionToken}; path=/; max-age=28800; SameSite=Lax`;
+      document.cookie = `token=${sessionToken}; path=/; max-age=28800; SameSite=Lax`;
+      localStorage.setItem('bitacora_user_profile', JSON.stringify(authUser));
+      localStorage.setItem('bitacora_session_expiry', String(expSeconds * 1000));
 
       // Gestión de recordar cuentas
       if (rememberMe) {
         let accounts = [...rememberedAccounts].filter(
           (a) => a.username.toLowerCase() !== username.toLowerCase()
         );
-        accounts.unshift({ username, password, role: rolDeterminado });
+        accounts.unshift({ username, password, role: authUser.rol });
         setRememberedAccounts(accounts);
         localStorage.setItem('bitacora_remembered_accounts', JSON.stringify(accounts));
       }
@@ -223,8 +320,8 @@ export default function LoginPage() {
       showSuccessToast('¡Sesión iniciada correctamente!');
 
       setTimeout(() => {
-        router.push('/dashboard');
-      }, 350);
+        window.location.href = '/dashboard';
+      }, 250);
     } catch (err: any) {
       showErrorToast('Error al iniciar sesión. Intenta nuevamente.');
     } finally {
@@ -243,26 +340,21 @@ export default function LoginPage() {
         fontFamily: "'Poppins', sans-serif",
       }}
     >
-      {/* Fondo con carretas y capa oscura para mejorar la legibilidad */}
+      {/* Fondo de alta resolución con carretas */}
       <div
         aria-hidden="true"
         className="absolute inset-0 overflow-hidden pointer-events-none"
         style={{
-          backgroundImage: 'url(/img.jpeg)',
+          backgroundImage: 'url(/fondo_carretas.png)',
           backgroundSize: 'cover',
-          backgroundPosition: 'center center',
+          backgroundPosition: 'center 40%',
           backgroundAttachment: 'fixed',
         }}
-      />
-      <div
-        aria-hidden="true"
-        className="absolute inset-0 pointer-events-none"
-        style={{
-          background:
-            'linear-gradient(180deg, rgba(72, 70, 71, 1) 0%, rgba(8, 4, 3, 0.58) 48%, rgba(8, 4, 3, 0.8) 100%), rgba(1, 4, 3, 0.22',
-        }}
-      />
-
+      >
+        {/* Capa de contraste oscuro para máxima nitidez y legibilidad */}
+        <div className="absolute inset-0 bg-black/45" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-transparent to-black/60" />
+      </div>
 
       {/* TOP NAVBAR: Botón de Acceso Rápido / Demo */}
       <div className="absolute top-0 left-0 right-0 h-[64px] z-20 flex items-center justify-end pr-6 pointer-events-auto">
@@ -323,7 +415,7 @@ export default function LoginPage() {
             className="text-[22px] font-bold text-white leading-tight"
             style={{
               fontFamily: 'Poppins, sans-serif',
-              textShadow: '0 2px 12px rgba(0,0,0,0.4)',
+              textShadow: '0 2px 12px rgba(0,0,0,0.5)',
             }}
           >
             Bitácora Electrónica
@@ -333,7 +425,7 @@ export default function LoginPage() {
         {/* Subtítulo */}
         <div className="mb-6 text-center animate-fadeIn" style={{ animationDelay: '0.04s' }}>
           <p
-            className="text-[12px] font-light text-orange-100/85"
+            className="text-[12px] font-light text-white/80"
             style={{ fontFamily: 'Poppins, sans-serif', letterSpacing: '0.02em' }}
           >
             Proyecto: Conexion VAS - Hincapie
@@ -365,14 +457,14 @@ export default function LoginPage() {
                   <button
                     type="button"
                     onClick={() => setShowRememberedDropdown(!showRememberedDropdown)}
-                    className="text-[#ff170f] hover:text-[#ff5b55] transition-all p-1 focus:outline-none flex items-center justify-center"
+                    className="text-white/60 hover:text-white transition-all p-1 focus:outline-none flex items-center justify-center"
                     title="Seleccionar usuario guardado"
                   >
                     <ChevronDown
                       size={16}
                       strokeWidth={1.5}
                       className={`transition-transform duration-200 ${
-                        showRememberedDropdown ? 'rotate-180 text-[#ff5b55]' : ''
+                        showRememberedDropdown ? 'rotate-180 text-white' : ''
                       }`}
                     />
                   </button>
@@ -383,12 +475,12 @@ export default function LoginPage() {
             {/* Dropdown de usuarios recordados */}
             {showRememberedDropdown && rememberedAccounts.length > 0 && (
               <div
-                className="absolute left-0 right-0 top-[42px] z-50 rounded-lg border border-orange-300/30 bg-[#24150d]/95 shadow-2xl backdrop-blur-md overflow-hidden max-h-[160px] overflow-y-auto animate-fadeIn"
+                className="absolute left-0 right-0 top-[42px] z-50 rounded-lg border border-white/20 bg-black/95 shadow-2xl backdrop-blur-md overflow-hidden max-h-[160px] overflow-y-auto animate-fadeIn"
                 style={{ fontFamily: 'Poppins, sans-serif' }}
               >
-                <div className="px-3 py-1.5 border-b border-orange-200/20 text-[10px] uppercase font-semibold text-orange-100/70 tracking-wider flex justify-between items-center bg-black/30">
+                <div className="px-3 py-1.5 border-b border-white/10 text-[10px] uppercase font-semibold text-white/60 tracking-wider flex justify-between items-center bg-black/40">
                   <span>Usuarios Guardados</span>
-                  <span className="text-[9px] text-orange-100/60">
+                  <span className="text-[9px] text-white/50">
                     {rememberedAccounts.length}
                   </span>
                 </div>
@@ -403,15 +495,15 @@ export default function LoginPage() {
                     }`}
                   >
                     <div className="flex items-center gap-2 overflow-hidden pr-2">
-                      <User size={13} className="text-orange-300 shrink-0" />
-                      <span className="text-[12px] text-orange-50/95 truncate font-medium">
+                      <User size={13} className="text-white/70 shrink-0" />
+                      <span className="text-[12px] text-white truncate font-medium">
                         {acc.username}
                       </span>
                     </div>
                     <button
                       type="button"
                       onClick={(e) => removeRememberedAccount(acc.username, e)}
-                      className="text-orange-100/50 hover:text-red-400 p-1 transition-colors shrink-0"
+                      className="text-white/40 hover:text-red-400 p-1 transition-colors shrink-0"
                       title="Eliminar de recordados"
                     >
                       <Trash2 size={13} />
@@ -462,10 +554,10 @@ export default function LoginPage() {
                 type="checkbox"
                 checked={rememberMe}
                 onChange={(e) => setRememberMe(e.target.checked)}
-                className="w-4 h-4 rounded border border-orange-300/70 bg-transparent cursor-pointer accent-orange-500"
+                className="w-4 h-4 rounded border border-white/50 bg-transparent cursor-pointer accent-white"
               />
               <span
-                className="text-xs text-orange-50"
+                className="text-xs text-white"
                 style={{ fontFamily: 'Poppins, sans-serif' }}
               >
                 Recuérdame
@@ -516,7 +608,7 @@ export default function LoginPage() {
           >
             <div
               style={{
-                background: 'rgba(28, 16, 10, 0.96)',
+                background: 'rgba(12, 12, 12, 0.98)',
                 border: '1px solid rgba(255, 255, 255, 0.12)',
                 borderRadius: '16px',
                 padding: '24px',

@@ -97,11 +97,11 @@ export default function PasswordRecoveryModal({
 
   return (
     <div
-      className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/75 backdrop-blur-md p-4 font-poppins"
+      className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 font-poppins"
       onClick={onClose}
     >
       <div
-        className="relative w-full max-w-sm bg-[#0a1128] rounded-2xl border border-white/15 p-6 shadow-2xl animate-slideUp font-poppins text-white"
+        className="relative w-full max-w-sm bg-black rounded-2xl border border-white/15 p-6 shadow-2xl animate-slideUp font-poppins text-white"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Close button */}
@@ -143,7 +143,7 @@ export default function PasswordRecoveryModal({
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               disabled={enviado}
-              className="w-full h-[40px] bg-white/5 rounded-lg border border-white/20 text-white placeholder-white/40 text-xs outline-none transition-all focus:border-blue-400 pl-10 pr-3 font-poppins"
+              className="w-full h-[40px] bg-white/5 rounded-lg border border-white/20 text-white placeholder-white/40 text-xs outline-none transition-all focus:border-white pl-10 pr-3 font-poppins"
             />
             <Mail
               size={16}
@@ -154,11 +154,11 @@ export default function PasswordRecoveryModal({
           <button
             type="submit"
             disabled={isSubmitting || enviado}
-            className="w-full h-[42px] bg-white text-[#0a1128] hover:bg-white/90 font-bold text-xs rounded-full transition-all duration-200 active:scale-95 disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2"
+            className="w-full h-[42px] bg-transparent border-2 border-white text-white hover:bg-white hover:text-black font-semibold text-xs rounded-full transition-all duration-200 active:scale-95 disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2"
           >
             {enviado ? (
               <>
-                <CheckCircle2 size={16} className="text-emerald-600" />
+                <CheckCircle2 size={16} className="text-emerald-400" />
                 <span>Instrucciones enviadas</span>
               </>
             ) : isSubmitting ? (

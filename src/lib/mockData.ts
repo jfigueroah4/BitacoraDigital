@@ -49,7 +49,7 @@ export function generarMesesPorDuracion(
   let curMes = duracion.mesInicio;
 
   // Safeguard to prevent infinite loops if dates are inverted
-  const maxIter = 120; // up to 10 years
+  const maxIter = 360; // up to 30 years
   let iter = 0;
 
   while (

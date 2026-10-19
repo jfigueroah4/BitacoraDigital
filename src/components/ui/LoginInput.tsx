@@ -26,7 +26,7 @@ export default function LoginInput({
         <div
           className="absolute left-0 top-1/2 -translate-y-1/2 pointer-events-none flex items-center"
           style={{
-            color: error ? '#FF4D4F' : '#ff170f',
+            color: error ? '#FF4D4F' : 'rgba(255, 255, 255, 0.8)',
             transition: 'color 0.25s ease',
           }}
         >
@@ -44,7 +44,7 @@ export default function LoginInput({
         required={required}
         {...restProps}
         style={{
-          borderBottom: error ? '1.5px solid #FF4D4F' : '1px solid rgba(255, 23, 15, 0.9)',
+          borderBottom: error ? '1.5px solid #FF4D4F' : '1px solid rgba(255, 255, 255, 0.5)',
           transition: 'border-bottom-color 0.25s ease, border-bottom-width 0.25s ease',
           paddingLeft: icon ? '26px' : '8px',
           paddingRight: rightIcon ? '36px' : '8px',
@@ -53,16 +53,17 @@ export default function LoginInput({
           login-field
           w-full h-[38px]
           bg-transparent
-          text-orange-50
-          placeholder-orange-100/60
+          text-white
+          placeholder-white/50
           font-poppins text-[11.5px] placeholder:text-[11px]
           outline-none
+          focus:border-b-white
         `}
       />
 
       {/* Right Icon */}
       {rightIcon && (
-        <div className="absolute right-0 top-1/2 -translate-y-1/2 flex items-center p-1">
+        <div className="absolute right-0 top-1/2 -translate-y-1/2 flex items-center p-1 text-white/70 hover:text-white">
           {rightIcon}
         </div>
       )}

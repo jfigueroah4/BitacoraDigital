@@ -48,25 +48,15 @@ export default function SubirDocumentoModal({
     );
   }, [documentosExistentes, mes, anio]);
 
-  // Update when suggested day/month changes
+  // Sincronizar fecha sugerida (por defecto la fecha de hoy) al abrir el modal
   useEffect(() => {
-    if (diaSugerido) setDia(diaSugerido);
-    if (mesSugerido) setMes(mesSugerido);
-    if (anioSugerido) setAnio(anioSugerido);
-  }, [diaSugerido, mesSugerido, anioSugerido, isOpen]);
-
-  // Si el día seleccionado está ocupado, auto-ajustar al primer día libre disponible
-  useEffect(() => {
-    if (isOpen && diasOcupados.has(dia)) {
-      const diasTotales = getDiasEnMes(mes, anio);
-      const primerLibre = Array.from({ length: diasTotales }, (_, i) => i + 1).find(
-        (d) => !diasOcupados.has(d)
-      );
-      if (primerLibre) {
-        setDia(primerLibre);
-      }
+    if (isOpen) {
+      const hoy = new Date();
+      setDia(diaSugerido ?? hoy.getDate());
+      setMes(mesSugerido ?? (hoy.getMonth() + 1));
+      setAnio(anioSugerido ?? hoy.getFullYear());
     }
-  }, [isOpen, diasOcupados, dia, mes, anio]);
+  }, [isOpen, diaSugerido, mesSugerido, anioSugerido]);
 
   // Handle escape key
   useEffect(() => {

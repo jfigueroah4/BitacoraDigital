@@ -21,21 +21,22 @@ export default function LoginButton({
       className={`
         w-full h-[44px]
         bg-transparent
-        border-2 border-[#ff170f]
-        text-[#ff5b55]
+        border-2 border-white
+        text-white
         font-poppins font-semibold text-base
         rounded-full
         transition-all duration-150
-        hover:bg-[#ff170f]
-        hover:text-white
-        hover:scale-[1.03]
+        hover:bg-white
+        hover:text-[#140B07]
+        hover:scale-[1.02]
         hover:shadow-lg
-        hover:shadow-red-950/50
+        hover:shadow-black/40
         active:scale-95
         disabled:opacity-50
         disabled:cursor-not-allowed
         disabled:hover:scale-100
         flex items-center justify-center
+        cursor-pointer
       `}
     >
       {children}

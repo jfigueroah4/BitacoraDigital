@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { ArrowLeft, Calendar, FileText, Plus, Search, Eye, ChevronLeft, ChevronRight, PencilLine, Trash2 } from 'lucide-react';
+import { ArrowLeft, Calendar, FileText, Plus, Search, Eye, ChevronLeft, ChevronRight, PencilLine, Trash2, Files } from 'lucide-react';
 import { MesInfo, DocumentoBitacora } from '@/types/bitacora';
 import { MESES_NOMBRES } from '@/lib/mockData';
 
@@ -15,6 +15,7 @@ interface VistaDiasProps {
   onEliminarDocumento?: (doc: DocumentoBitacora) => void;
   esAdmin: boolean;
   onSubirParaDia: (dia: number) => void;
+  onAbrirCargaMultiple?: () => void;
 }
 
 export default function VistaDias({
@@ -27,6 +28,7 @@ export default function VistaDias({
   onEliminarDocumento,
   esAdmin,
   onSubirParaDia,
+  onAbrirCargaMultiple,
 }: VistaDiasProps) {
   const [filtroDiaTexto, setFiltroDiaTexto] = useState('');
 

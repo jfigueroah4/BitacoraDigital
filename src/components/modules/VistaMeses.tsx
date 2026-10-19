@@ -1,7 +1,21 @@
 'use client';
 
-import React, { useState } from 'react';
-import { Calendar, ChevronRight, FileText, Filter, Plus, ChevronLeft, Clock, Settings, X, Check } from 'lucide-react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { createPortal } from 'react-dom';
+import {
+  Calendar,
+  ChevronRight,
+  FileText,
+  Filter,
+  Plus,
+  ChevronLeft,
+  Clock,
+  Settings,
+  X,
+  Check,
+  ChevronDown,
+  AlertCircle,
+} from 'lucide-react';
 import { MesInfo } from '@/types/bitacora';
 import { DuracionProyecto, MESES_NOMBRES } from '@/lib/mockData';
 
@@ -21,7 +35,252 @@ interface VistaMesesProps {
   onGuardarDuracion: (nueva: DuracionProyecto) => void;
 }
 
-const ANIOS_DISPONIBLES = [2024, 2025, 2026, 2027, 2028, 2029, 2030];
+const ANIOS_DISPONIBLES = [2024, 2025, 2026, 2027, 2028, 2029, 2030, 2031, 2032, 2033, 2034, 2035, 2036];
+
+/**
+ * Combobox interactivo para Mes: Permite escribir o seleccionar entre los 12 meses
+ */
+function ComboboxMes({
+  value,
+  onChange,
+  disabled,
+}: {
+  value: number;
+  onChange: (mes: number) => void;
+  disabled?: boolean;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const mesActualNombre = MESES_NOMBRES[value - 1] || 'Enero';
+
+  useEffect(() => {
+    if (!isOpen) {
+      setQuery(mesActualNombre);
+    }
+  }, [value, isOpen, mesActualNombre]);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+        setQuery(mesActualNombre);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [mesActualNombre]);
+
+  const mesesFiltrados = useMemo(() => {
+    if (!query.trim()) {
+      return MESES_NOMBRES.map((nombre, i) => ({ nombre, mes: i + 1 }));
+    }
+    const q = query.toLowerCase().trim();
+    return MESES_NOMBRES.map((nombre, i) => ({ nombre, mes: i + 1 })).filter((m) =>
+      m.nombre.toLowerCase().includes(q)
+    );
+  }, [query]);
+
+  return (
+    <div ref={containerRef} className="relative w-full">
+      <div className="relative">
+        <input
+          type="text"
+          value={query}
+          disabled={disabled}
+          onFocus={() => {
+            setIsOpen(true);
+            setQuery('');
+          }}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setIsOpen(true);
+            const matchIndex = MESES_NOMBRES.findIndex(
+              (m) => m.toLowerCase() === e.target.value.toLowerCase().trim()
+            );
+            if (matchIndex !== -1) {
+              onChange(matchIndex + 1);
+            }
+          }}
+          placeholder="Escribe o selecciona..."
+          className="w-full px-3 py-2 pr-8 bg-white border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 outline-none focus:border-[#3B2219] focus:ring-1 focus:ring-[#3B2219] transition-all cursor-text shadow-2xs"
+        />
+        <button
+          type="button"
+          tabIndex={-1}
+          onClick={() => {
+            setIsOpen(!isOpen);
+            if (!isOpen) setQuery('');
+          }}
+          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 cursor-pointer p-0.5"
+        >
+          <ChevronDown
+            size={14}
+            className={`transition-transform duration-200 ${isOpen ? 'rotate-180 text-[#3B2219]' : ''}`}
+          />
+        </button>
+      </div>
+
+      {isOpen && (
+        <div className="absolute z-50 mt-1 max-h-48 w-full overflow-y-auto rounded-xl border border-gray-200 bg-white shadow-xl py-1 font-poppins animate-fadeIn">
+          {mesesFiltrados.length > 0 ? (
+            mesesFiltrados.map((item) => {
+              const isSelected = item.mes === value;
+              return (
+                <button
+                  key={item.mes}
+                  type="button"
+                  onClick={() => {
+                    onChange(item.mes);
+                    setQuery(item.nombre);
+                    setIsOpen(false);
+                  }}
+                  className={`w-full text-left px-3.5 py-1.5 text-xs flex items-center justify-between transition-colors cursor-pointer ${
+                    isSelected
+                      ? 'bg-[#F4ECE6] text-[#3B2219] font-bold'
+                      : 'text-gray-700 hover:bg-gray-50 font-medium'
+                  }`}
+                >
+                  <span>{item.nombre}</span>
+                  {isSelected && <Check size={13} className="text-[#3B2219]" />}
+                </button>
+              );
+            })
+          ) : (
+            <div className="px-3 py-2 text-center text-xs text-gray-400">
+              No se encontró ningún mes
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Combobox interactivo para Año: Permite escribir directamente o seleccionar entre 10+ años desde 2026
+ */
+function ComboboxAnio({
+  value,
+  onChange,
+  disabled,
+}: {
+  value: number;
+  onChange: (anio: number) => void;
+  disabled?: boolean;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [query, setQuery] = useState(String(value));
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Lista de 10+ años desde 2026 (2026 a 2036+, más años recientes 2024 y 2025)
+  const aniosDisponibles = useMemo(() => {
+    const list: number[] = [2024, 2025];
+    for (let y = 2026; y <= 2038; y++) {
+      list.push(y);
+    }
+    return list;
+  }, []);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setQuery(String(value));
+    }
+  }, [value, isOpen]);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+        const parsed = parseInt(query, 10);
+        if (!isNaN(parsed) && parsed >= 1990 && parsed <= 2100) {
+          onChange(parsed);
+          setQuery(String(parsed));
+        } else {
+          setQuery(String(value));
+        }
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [query, value, onChange]);
+
+  const aniosFiltrados = useMemo(() => {
+    if (!query.trim()) return aniosDisponibles;
+    const q = query.trim();
+    return aniosDisponibles.filter((a) => String(a).includes(q));
+  }, [query, aniosDisponibles]);
+
+  return (
+    <div ref={containerRef} className="relative w-full">
+      <div className="relative">
+        <input
+          type="number"
+          value={query}
+          disabled={disabled}
+          onFocus={() => {
+            setIsOpen(true);
+          }}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setIsOpen(true);
+            const parsed = parseInt(e.target.value, 10);
+            if (!isNaN(parsed) && parsed >= 1990 && parsed <= 2100) {
+              onChange(parsed);
+            }
+          }}
+          placeholder="Ej. 2026"
+          className="w-full px-3 py-2 pr-8 bg-white border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 outline-none focus:border-[#3B2219] focus:ring-1 focus:ring-[#3B2219] transition-all cursor-text shadow-2xs [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+        />
+        <button
+          type="button"
+          tabIndex={-1}
+          onClick={() => setIsOpen(!isOpen)}
+          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 cursor-pointer p-0.5"
+        >
+          <ChevronDown
+            size={14}
+            className={`transition-transform duration-200 ${isOpen ? 'rotate-180 text-[#3B2219]' : ''}`}
+          />
+        </button>
+      </div>
+
+      {isOpen && (
+        <div className="absolute z-50 mt-1 max-h-48 w-full overflow-y-auto rounded-xl border border-gray-200 bg-white shadow-xl py-1 font-poppins animate-fadeIn">
+          {aniosFiltrados.length > 0 ? (
+            aniosFiltrados.map((a) => {
+              const isSelected = a === value;
+              return (
+                <button
+                  key={a}
+                  type="button"
+                  onClick={() => {
+                    onChange(a);
+                    setQuery(String(a));
+                    setIsOpen(false);
+                  }}
+                  className={`w-full text-left px-3.5 py-1.5 text-xs flex items-center justify-between transition-colors cursor-pointer ${
+                    isSelected
+                      ? 'bg-[#F4ECE6] text-[#3B2219] font-bold'
+                      : 'text-gray-700 hover:bg-gray-50 font-medium'
+                  }`}
+                >
+                  <span>{a}</span>
+                  {isSelected && <Check size={13} className="text-[#3B2219]" />}
+                </button>
+              );
+            })
+          ) : (
+            <div className="px-3 py-2 text-center text-xs text-gray-400">
+              Presiona Enter o haz clic fuera para usar {query}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function VistaMeses({
   meses,
@@ -40,6 +299,12 @@ export default function VistaMeses({
 }: VistaMesesProps) {
   const hayFiltrosFecha = Boolean(fechaInicio || fechaFin);
 
+  // Portal mount check
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   // Modal para configurar duración del proyecto
   const [modalDuracionAbierto, setModalDuracionAbierto] = useState(false);
   const [tempMesInicio, setTempMesInicio] = useState(duracionProyecto.mesInicio);
@@ -57,6 +322,12 @@ export default function VistaMeses({
 
   const totalFolios = meses.reduce((acc, m) => acc + m.diasConDocumentos, 0);
 
+  // Validación: la fecha de fin DEBE ser mayor a la fecha de inicio (no pueden ser iguales ni fin menor)
+  const fechaInicioVal = tempAnioInicio * 12 + tempMesInicio;
+  const fechaFinVal = tempAnioFin * 12 + tempMesFin;
+  const esInvalido = fechaFinVal <= fechaInicioVal;
+  const totalMesesDuracion = !esInvalido ? fechaFinVal - fechaInicioVal + 1 : 0;
+
   const handleAbrirModalDuracion = () => {
     setTempMesInicio(duracionProyecto.mesInicio);
     setTempAnioInicio(duracionProyecto.anioInicio);
@@ -67,6 +338,8 @@ export default function VistaMeses({
 
   const handleGuardarDuracion = (e: React.FormEvent) => {
     e.preventDefault();
+    if (esInvalido) return;
+
     onGuardarDuracion({
       mesInicio: tempMesInicio,
       anioInicio: tempAnioInicio,
@@ -156,27 +429,6 @@ export default function VistaMeses({
                 />
               </div>
 
-              {/* Selector de Año a la par de las fechas */}
-              <div className="flex items-center gap-1.5 bg-white border border-gray-200 rounded-lg px-2.5 py-1 shadow-2xs">
-                <span className="text-[10px] font-bold text-gray-400 uppercase">Año:</span>
-                <select
-                  value={anioActual}
-                  onChange={(e) => {
-                    const val = e.target.value === 'todos' ? 'todos' : Number(e.target.value);
-                    onAnioChange?.(val);
-                    setPaginaActual(1);
-                  }}
-                  className="bg-transparent text-xs font-medium text-gray-800 outline-none cursor-pointer"
-                >
-                  <option value="todos">Todos los meses</option>
-                  {ANIOS_DISPONIBLES.map((a) => (
-                    <option key={a} value={a}>
-                      {a}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
               {hayFiltrosFecha && (
                 <button
                   type="button"
@@ -186,10 +438,31 @@ export default function VistaMeses({
                   Limpiar fechas
                 </button>
               )}
+
+              {/* Selector de Años a la par de los filtros */}
+              <div className="flex items-center gap-1.5 bg-white border border-gray-200 rounded-lg px-2.5 py-1 shadow-2xs ml-1">
+                <span className="text-[10px] font-bold text-gray-400 uppercase">Año:</span>
+                <select
+                  value={anioActual}
+                  onChange={(e) => {
+                    const val = e.target.value === 'todos' ? 'todos' : Number(e.target.value);
+                    onAnioChange?.(val);
+                    setPaginaActual(1);
+                  }}
+                  className="bg-transparent text-xs font-bold text-gray-900 outline-none cursor-pointer"
+                >
+                  <option value="todos">Todos los meses</option>
+                  {ANIOS_DISPONIBLES.map((a) => (
+                    <option key={a} value={a}>
+                      {a}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
           </div>
 
-          {/* Lado derecho: Botón Subir Documento en café oscuro */}
+          {/* Lado derecho: Botón Subir Documento */}
           {esAdmin && (
             <button
               type="button"
@@ -203,7 +476,7 @@ export default function VistaMeses({
         </div>
       </div>
 
-      {/* Grid de Meses con acentos en Café Oscuro */}
+      {/* Grid de Meses */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
         {mesesPaginados.map((m) => {
           const tieneDocs = m.diasConDocumentos > 0;
@@ -313,119 +586,147 @@ export default function VistaMeses({
         </div>
       </div>
 
-      {/* Modal para establecer la duración del proyecto adaptado y pulido */}
-      {modalDuracionAbierto && (
-        <div className="fixed left-0 top-0 z-[100] flex h-screen w-screen items-center justify-center bg-black/60 p-4 backdrop-blur-2xs animate-fadeIn">
-          <div className="bg-white rounded-2xl shadow-2xl border border-gray-200 w-full max-w-md overflow-hidden animate-scaleIn">
-            <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-100 bg-gray-50/80">
+      {/* Modal para establecer la duración del proyecto renderizado en el portal de document.body para evitar desalineaciones */}
+      {mounted && modalDuracionAbierto && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fadeIn overflow-y-auto">
+          {/* Backdrop con clic para cerrar */}
+          <div
+            className="fixed inset-0 -z-10"
+            onClick={() => setModalDuracionAbierto(false)}
+          />
+
+          <div
+            className="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-visible flex flex-col my-auto animate-scaleIn font-poppins"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Cabecera del modal */}
+            <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-100 bg-gray-50/80 rounded-t-2xl">
               <div className="flex items-center gap-2.5">
-                <div className="w-7 h-7 rounded-lg bg-[#F4ECE6] flex items-center justify-center text-[#3B2219]">
+                <div className="w-8 h-8 rounded-lg bg-[#F4ECE6] flex items-center justify-center text-[#3B2219]">
                   <Clock size={16} />
                 </div>
-                <h3 className="text-xs sm:text-sm font-bold text-gray-900">
-                  Establecer Duración del Proyecto
-                </h3>
+                <div>
+                  <h3 className="text-xs sm:text-sm font-bold text-gray-900 leading-tight">
+                    Establecer Duración del Proyecto
+                  </h3>
+                  <p className="text-[10px] text-gray-500">
+                    Define los meses y años correspondientes de la bitácora
+                  </p>
+                </div>
               </div>
               <button
                 type="button"
                 onClick={() => setModalDuracionAbierto(false)}
-                className="text-gray-400 hover:text-gray-700 p-1 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
+                className="text-gray-400 hover:text-gray-700 p-1.5 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
               >
                 <X size={16} />
               </button>
             </div>
 
+            {/* Formulario */}
             <form onSubmit={handleGuardarDuracion} className="p-5 space-y-4 text-xs">
               <p className="text-[11px] text-gray-500 leading-relaxed">
-                Define el rango de inicio y fin de la obra para generar automáticamente todos los meses correspondientes en la bitácora digital.
+                Define el rango de inicio y fin de la obra para generar automáticamente todos los meses correspondientes en la bitácora digital. Puedes seleccionar de la lista o escribir el mes y año.
               </p>
 
               {/* Rango de Inicio */}
               <div className="bg-gray-50/90 border border-gray-200 rounded-xl p-3.5 space-y-2">
-                <span className="text-[10px] font-bold text-[#3B2219] uppercase tracking-wider block">
+                <span className="text-[10.5px] font-bold text-[#3B2219] uppercase tracking-wider block">
                   Inicio de la Obra
                 </span>
-                <div className="grid grid-cols-2 gap-2.5">
+                <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="text-[10px] text-gray-500 font-semibold block mb-1">Mes:</label>
-                    <select
+                    <label className="text-[10px] text-gray-500 font-semibold block mb-1">
+                      Mes:
+                    </label>
+                    <ComboboxMes
                       value={tempMesInicio}
-                      onChange={(e) => setTempMesInicio(Number(e.target.value))}
-                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 outline-none focus:border-[#3B2219] focus:ring-1 focus:ring-[#3B2219] cursor-pointer"
-                    >
-                      {MESES_NOMBRES.map((nombre, idx) => (
-                        <option key={idx} value={idx + 1}>
-                          {nombre}
-                        </option>
-                      ))}
-                    </select>
+                      onChange={(mes) => setTempMesInicio(mes)}
+                    />
                   </div>
                   <div>
-                    <label className="text-[10px] text-gray-500 font-semibold block mb-1">Año:</label>
-                    <select
+                    <label className="text-[10px] text-gray-500 font-semibold block mb-1">
+                      Año (Escribe o selecciona):
+                    </label>
+                    <ComboboxAnio
                       value={tempAnioInicio}
-                      onChange={(e) => setTempAnioInicio(Number(e.target.value))}
-                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 outline-none focus:border-[#3B2219] focus:ring-1 focus:ring-[#3B2219] cursor-pointer"
-                    >
-                      {ANIOS_DISPONIBLES.map((a) => (
-                        <option key={a} value={a}>
-                          {a}
-                        </option>
-                      ))}
-                    </select>
+                      onChange={(anio) => setTempAnioInicio(anio)}
+                    />
                   </div>
                 </div>
               </div>
 
               {/* Rango de Término */}
-              <div className="bg-gray-50/90 border border-gray-200 rounded-xl p-3.5 space-y-2">
-                <span className="text-[10px] font-bold text-[#3B2219] uppercase tracking-wider block">
+              <div
+                className={`border rounded-xl p-3.5 space-y-2 transition-colors ${
+                  esInvalido
+                    ? 'bg-red-50/40 border-red-300'
+                    : 'bg-gray-50/90 border-gray-200'
+                }`}
+              >
+                <span className="text-[10.5px] font-bold text-[#3B2219] uppercase tracking-wider block">
                   Término de la Obra
                 </span>
-                <div className="grid grid-cols-2 gap-2.5">
+                <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="text-[10px] text-gray-500 font-semibold block mb-1">Mes:</label>
-                    <select
+                    <label className="text-[10px] text-gray-500 font-semibold block mb-1">
+                      Mes:
+                    </label>
+                    <ComboboxMes
                       value={tempMesFin}
-                      onChange={(e) => setTempMesFin(Number(e.target.value))}
-                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 outline-none focus:border-[#3B2219] focus:ring-1 focus:ring-[#3B2219] cursor-pointer"
-                    >
-                      {MESES_NOMBRES.map((nombre, idx) => (
-                        <option key={idx} value={idx + 1}>
-                          {nombre}
-                        </option>
-                      ))}
-                    </select>
+                      onChange={(mes) => setTempMesFin(mes)}
+                    />
                   </div>
                   <div>
-                    <label className="text-[10px] text-gray-500 font-semibold block mb-1">Año:</label>
-                    <select
+                    <label className="text-[10px] text-gray-500 font-semibold block mb-1">
+                      Año (Escribe o selecciona):
+                    </label>
+                    <ComboboxAnio
                       value={tempAnioFin}
-                      onChange={(e) => setTempAnioFin(Number(e.target.value))}
-                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 outline-none focus:border-[#3B2219] focus:ring-1 focus:ring-[#3B2219] cursor-pointer"
-                    >
-                      {ANIOS_DISPONIBLES.map((a) => (
-                        <option key={a} value={a}>
-                          {a}
-                        </option>
-                      ))}
-                    </select>
+                      onChange={(anio) => setTempAnioFin(anio)}
+                    />
                   </div>
                 </div>
               </div>
 
+              {/* Alerta de Validación o Resumen */}
+              {esInvalido ? (
+                <div className="p-3 rounded-xl bg-red-50 border border-red-200 flex items-start gap-2.5 text-red-800 text-[11px] animate-fadeIn">
+                  <AlertCircle size={16} className="text-red-600 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-bold">Rango de fechas no válido</p>
+                    <p className="text-red-600 mt-0.5 leading-snug">
+                      La fecha de término debe ser posterior a la fecha de inicio. No pueden ser iguales ni la fecha de fin puede ser menor a la de inicio.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-between text-emerald-800 text-[11px] animate-fadeIn">
+                  <div className="flex items-center gap-1.5 font-semibold">
+                    <Check size={14} className="text-emerald-600 shrink-0" />
+                    <span>
+                      Duración válida: {totalMesesDuracion} meses calculados
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-emerald-700 font-medium">
+                    {MESES_NOMBRES[tempMesInicio - 1]} {tempAnioInicio} &rarr; {MESES_NOMBRES[tempMesFin - 1]} {tempAnioFin}
+                  </span>
+                </div>
+              )}
+
               {/* Botones de acción */}
-              <div className="pt-2 flex items-center justify-end gap-2">
+              <div className="pt-2 flex items-center justify-end gap-2.5 border-t border-gray-100">
                 <button
                   type="button"
                   onClick={() => setModalDuracionAbierto(false)}
-                  className="px-3.5 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-100 rounded-xl transition-colors cursor-pointer"
+                  className="px-4 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-100 rounded-xl transition-colors cursor-pointer"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#3B2219] hover:bg-[#2A1710] text-white text-xs font-bold rounded-xl transition-colors shadow-2xs cursor-pointer"
+                  disabled={esInvalido}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#3B2219] hover:bg-[#2A1710] text-white text-xs font-bold rounded-xl transition-all shadow-2xs cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   <Check size={14} />
                   <span>Aplicar Duración</span>
@@ -433,7 +734,8 @@ export default function VistaMeses({
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

@@ -53,18 +53,10 @@ export default function DashboardPage() {
     try {
       const storedUser = localStorage.getItem('bitacora_user_profile');
       if (!storedUser) {
-        const defaultProfile: UserProfile = {
-          id: 'admin',
-          nombre: 'Daniel Figueroa',
-          email: 'admin@bitacoradigital.com',
-          rol: 'Administrador',
-          cargo: 'Administrador de Proyecto',
-        };
-        setUserProfile(defaultProfile);
-        localStorage.setItem('bitacora_user_profile', JSON.stringify(defaultProfile));
-      } else {
-        setUserProfile(JSON.parse(storedUser));
+        window.location.href = '/login';
+        return;
       }
+      setUserProfile(JSON.parse(storedUser));
 
       // Cargar duración del proyecto si existe guardada
       const storedDuracion = localStorage.getItem('bitacora_duracion_proyecto');
@@ -275,11 +267,10 @@ export default function DashboardPage() {
             }}
             esAdmin={esAdmin}
             onAbrirSubida={() => {
-              setDiaSugeridoParaSubir(new Date().getDate());
-              setMesSugeridoParaSubir(new Date().getMonth() + 1);
-              setAnioSugeridoParaSubir(
-                typeof anioActual === 'number' ? anioActual : duracionProyecto.anioInicio
-              );
+              const hoy = new Date();
+              setDiaSugeridoParaSubir(hoy.getDate());
+              setMesSugeridoParaSubir(hoy.getMonth() + 1);
+              setAnioSugeridoParaSubir(hoy.getFullYear());
               setModalSubirAbierto(true);
             }}
             fechaInicio={fechaInicio}

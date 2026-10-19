@@ -230,11 +230,13 @@ export default function TopBar({
     setProfileOpen(false);
     try {
       localStorage.removeItem('bitacora_user_profile');
+      localStorage.removeItem('bitacora_session_expiry');
       document.cookie = 'bitacora_token=; path=/; max-age=0';
+      document.cookie = 'token=; path=/; max-age=0';
     } catch (_) {}
     showSuccessToast('Sesión cerrada correctamente');
     setTimeout(() => {
-      router.push('/login');
+      window.location.href = '/login';
     }, 250);
   };
 
