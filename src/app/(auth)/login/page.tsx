@@ -157,11 +157,26 @@ export default function LoginPage() {
     setIsSubmitting(true);
 
     try {
+      const userTrim = username.trim().toLowerCase();
       const cleanUser = userTrim.startsWith('@') ? userTrim.substring(1) : userTrim;
       const passTrim = password.trim();
 
       let authUser: UserProfile | null = null;
       let emailParaAuth = userTrim.includes('@') && userTrim.includes('.') ? userTrim : '';
+
+      // Mapeo directo de usuarios base conocidos por su username
+      const usuariosBaseMap: Record<string, { email: string; nombre: string; rol: UserRole; cargo: string }> = {
+        admin: { email: 'admin@bitacoradigital.com', nombre: 'Daniel Figueroa', rol: 'Administrador', cargo: 'Administrador de Proyecto' },
+        danielfigueroa: { email: 'admin@bitacoradigital.com', nombre: 'Daniel Figueroa', rol: 'Administrador', cargo: 'Administrador de Proyecto' },
+        usuario: { email: 'usuario@bitacoradigital.com', nombre: 'Jorge Figueroa', rol: 'Usuario', cargo: 'Supervisor de Obra' },
+        jorgefigueroa: { email: 'usuario@bitacoradigital.com', nombre: 'Jorge Figueroa', rol: 'Usuario', cargo: 'Supervisor de Obra' },
+        residente: { email: 'residente@bitacoradigital.com', nombre: 'Raúl Alvarado', rol: 'Usuario', cargo: 'Ingeniero Residente' },
+        raulalvarado: { email: 'residente@bitacoradigital.com', nombre: 'Raúl Alvarado', rol: 'Usuario', cargo: 'Ingeniero Residente' },
+      };
+
+      if (!emailParaAuth && usuariosBaseMap[cleanUser]) {
+        emailParaAuth = usuariosBaseMap[cleanUser].email;
+      }
 
       // Buscar si el texto ingresado corresponde al username de un usuario guardado
       let listUsuarios: any[] = [];
@@ -231,7 +246,7 @@ export default function LoginPage() {
 
       // 2. Validar con Accesos Rápidos y Usuarios Registrados
       if (!authUser) {
-        // Validar contra ACCESOS_RAPIDOS
+        // Validar contra ACCESOS_RAPIDOS y usuariosBaseMap
         const matchedQuick = ACCESOS_RAPIDOS.find(
           (a) =>
             (a.email.toLowerCase() === userTrim ||
@@ -250,6 +265,15 @@ export default function LoginPage() {
               matchedQuick.role === 'Administrador'
                 ? 'Administrador de Proyecto'
                 : 'Supervisor de Obra',
+          };
+        } else if (usuariosBaseMap[cleanUser] && passTrim === 'mariobros25') {
+          const uBase = usuariosBaseMap[cleanUser];
+          authUser = {
+            id: `base-${cleanUser}`,
+            nombre: uBase.nombre,
+            email: uBase.email,
+            rol: uBase.rol,
+            cargo: uBase.cargo,
           };
         } else if (usuarioPorUsername) {
           // Validar contraseña de usuario registrado por username o correo
