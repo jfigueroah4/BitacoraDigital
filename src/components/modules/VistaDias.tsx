@@ -190,14 +190,28 @@ export default function VistaDias({
             </div>
 
             {esAdmin && (
-              <button
-                type="button"
-                onClick={() => onSubirParaDia(new Date().getDate())}
-                className="inline-flex items-center gap-1.5 bg-[#3B2219] hover:bg-[#2A1710] text-white text-xs font-bold px-3 py-1.5 rounded-lg shadow-2xs transition-colors duration-200 cursor-pointer"
-              >
-                <Plus size={14} strokeWidth={2.5} />
-                <span className="hidden sm:inline">Subir para este mes</span>
-              </button>
+              <div className="flex items-center gap-2">
+                {onAbrirCargaMultiple && (
+                  <button
+                    type="button"
+                    onClick={onAbrirCargaMultiple}
+                    className="inline-flex items-center gap-1.5 bg-white border border-gray-200 hover:border-[#3B2219] hover:bg-[#F4ECE6]/50 text-gray-800 text-xs font-bold px-3 py-1.5 rounded-lg shadow-2xs transition-all cursor-pointer"
+                    title="Subir varios archivos en lote para diferentes fechas"
+                  >
+                    <Files size={14} className="text-[#3B2219]" strokeWidth={2.3} />
+                    <span className="hidden sm:inline">Carga Múltiple</span>
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => onSubirParaDia(new Date().getDate())}
+                  className="inline-flex items-center gap-1.5 bg-[#3B2219] hover:bg-[#2A1710] text-white text-xs font-bold px-3 py-1.5 rounded-lg shadow-2xs transition-colors duration-200 cursor-pointer"
+                >
+                  <Plus size={14} strokeWidth={2.5} />
+                  <span className="hidden sm:inline">Subir para este mes</span>
+                </button>
+              </div>
             )}
           </div>
         </div>

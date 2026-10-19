@@ -345,7 +345,7 @@ export default function LoginPage() {
         aria-hidden="true"
         className="absolute inset-0 overflow-hidden pointer-events-none"
         style={{
-          backgroundImage: 'url(/fondo_carretas.png)',
+          backgroundImage: 'url(/img.jpg)',
           backgroundSize: 'cover',
           backgroundPosition: 'center 40%',
           backgroundAttachment: 'fixed',

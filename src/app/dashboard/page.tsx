@@ -9,6 +9,7 @@ import PdfViewerModal from '@/components/modals/PdfViewerModal';
 import SubirDocumentoModal from '@/components/modals/SubirDocumentoModal';
 import EditarDocumentoModal from '@/components/modals/EditarDocumentoModal';
 import EliminarDocumentoModal from '@/components/modals/EliminarDocumentoModal';
+import CargaMultipleDrawer from '@/components/modals/CargaMultipleDrawer';
 import { DocumentoBitacora, MesInfo, UserProfile } from '@/types/bitacora';
 import {
   DOCUMENTOS_INICIALES,
@@ -44,6 +45,7 @@ export default function DashboardPage() {
   const [documentoParaEliminar, setDocumentoParaEliminar] = useState<DocumentoBitacora | null>(null);
   const [eliminandoDoc, setEliminandoDoc] = useState(false);
   const [modalSubirAbierto, setModalSubirAbierto] = useState(false);
+  const [modalCargaMultipleAbierto, setModalCargaMultipleAbierto] = useState(false);
   const [diaSugeridoParaSubir, setDiaSugeridoParaSubir] = useState<number>(new Date().getDate());
   const [mesSugeridoParaSubir, setMesSugeridoParaSubir] = useState<number>(new Date().getMonth() + 1);
   const [anioSugeridoParaSubir, setAnioSugeridoParaSubir] = useState<number>(2026);
@@ -182,6 +184,19 @@ export default function DashboardPage() {
     });
   };
 
+  // Handler for uploading multiple documents
+  const handleDocumentosMultiplesSubidos = (nuevosDocs: DocumentoBitacora[]) => {
+    setDocumentos((prev) => {
+      const clavesNuevas = new Set(nuevosDocs.map((nd) => `${nd.anio}-${nd.mes}-${nd.dia}`));
+      const noReemplazados = prev.filter((d) => !clavesNuevas.has(`${d.anio}-${d.mes}-${d.dia}`));
+      const actualizados = [...nuevosDocs, ...noReemplazados];
+      try {
+        localStorage.setItem('bitacora_documentos_lista', JSON.stringify(actualizados));
+      } catch (_) {}
+      return actualizados;
+    });
+  };
+
   const handleSubirParaDia = (dia: number) => {
     setDiaSugeridoParaSubir(dia);
     if (mesSeleccionadoNum) {
@@ -302,6 +317,7 @@ export default function DashboardPage() {
               onEliminarDocumento={(doc) => setDocumentoParaEliminar(doc)}
               esAdmin={esAdmin}
               onSubirParaDia={handleSubirParaDia}
+              onAbrirCargaMultiple={() => setModalCargaMultipleAbierto(true)}
             />
           )
         )}
@@ -332,7 +348,7 @@ export default function DashboardPage() {
         eliminando={eliminandoDoc}
       />
 
-      {/* DRAWER LATERAL DE SUBIDA PARA ADMINISTRADOR */}
+      {/* DRAWER LATERAL DE SUBIDA INDIVIDUAL PARA ADMINISTRADOR */}
       <SubirDocumentoModal
         isOpen={modalSubirAbierto}
         onClose={() => setModalSubirAbierto(false)}
@@ -342,6 +358,16 @@ export default function DashboardPage() {
         usuarioNombre={userProfile?.nombre || 'Administrador'}
         onDocumentoSubido={handleDocumentoSubido}
         documentosExistentes={documentos}
+      />
+
+      {/* DRAWER LATERAL DE CARGA MÚLTIPLE DE ARCHIVOS Y FECHAS */}
+      <CargaMultipleDrawer
+        isOpen={modalCargaMultipleAbierto}
+        onClose={() => setModalCargaMultipleAbierto(false)}
+        mesActual={mesActivoObj?.mes || (typeof mesSeleccionadoNum === 'number' ? mesSeleccionadoNum : new Date().getMonth() + 1)}
+        anioActual={mesActivoObj?.anio || (typeof anioActual === 'number' ? anioActual : new Date().getFullYear())}
+        usuarioNombre={userProfile?.nombre || 'Administrador'}
+        onDocumentosSubidos={handleDocumentosMultiplesSubidos}
       />
     </div>
   );

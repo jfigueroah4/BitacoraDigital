@@ -14,6 +14,7 @@ export function middleware(request: NextRequest) {
     '/logoumg.png',
     '/white_logo.png',
     '/fondo_carretas.png',
+    '/img.jpg',
     '/images',
   ];
 
