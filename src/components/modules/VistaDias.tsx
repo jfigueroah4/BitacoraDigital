@@ -108,7 +108,7 @@ export default function VistaDias({
             <div>
               <div className="flex items-center gap-1.5 leading-none">
                 <span className="text-[9.5px] font-bold uppercase tracking-wider text-gray-400">
-                  Bitácora Digital &bull; {mesInfo.anio}
+                  Bitácora Electrónica &bull; {mesInfo.anio}
                 </span>
                 <span className="text-[10px] text-gray-300">&bull;</span>
                 <span className="text-[10px] font-bold text-[#3B2219]">

@@ -358,10 +358,10 @@ export default function VistaMeses({
       {/* Título en grande centrado sin ningún fondo distinto */}
       <div className="text-center pt-1 pb-3 select-none">
         <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold tracking-tight text-gray-900 uppercase">
-          Bitácora Digital
+          Bitácora Electrónica
         </h1>
-        <p className="text-xs sm:text-sm font-semibold text-gray-500 uppercase tracking-widest mt-0.5">
-          VAI - ANCOPIE
+        <p className="text-xs sm:text-sm font-semibold text-gray-500 tracking-wider mt-0.5">
+          Proyecto: Conexion VAS - Hincapie
         </p>
       </div>
 

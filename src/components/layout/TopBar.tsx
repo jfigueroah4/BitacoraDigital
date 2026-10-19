@@ -100,7 +100,7 @@ export default function TopBar({
   searchQuery = '',
   onSearchChange,
   userProfile,
-  bitacoraNombre = 'BITÁCORA VAI - ANCOPIE',
+  bitacoraNombre = 'Proyecto: Conexion VAS - Hincapie',
   onVolverInicio,
 }: TopBarProps) {
   const router = useRouter();
@@ -332,7 +332,7 @@ export default function TopBar({
         </div>
         <div className="flex flex-col leading-tight select-none">
           <span className="text-[8px] font-normal text-gray-400 uppercase tracking-widest hidden sm:block">
-            Módulo de Bitácora Digital
+            Módulo de Bitácora Electrónica
           </span>
           <span className="text-[11px] sm:text-[12px] text-gray-700 font-medium tracking-tight truncate max-w-[170px] sm:max-w-none group-hover:text-[#3B2219] transition-colors">
             {bitacoraNombre}

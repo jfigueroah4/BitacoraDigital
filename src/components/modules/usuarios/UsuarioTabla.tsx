@@ -101,7 +101,12 @@ export const UsuarioTabla = React.memo(function UsuarioTabla({
                     <p className="text-[12px] font-bold text-gray-900 truncate leading-tight">
                       {nombreCompleto}
                     </p>
-                    <p className="text-[10px] text-gray-500 truncate mt-0.5">{usuario.correo}</p>
+                    <p className="text-[10px] text-[#9B0F06] font-semibold truncate mt-0.5">
+                      {usuario.username ? `@${usuario.username}` : usuario.correo}
+                    </p>
+                    {usuario.username && (
+                      <p className="text-[9.5px] text-gray-400 truncate">{usuario.correo}</p>
+                    )}
                   </div>
                 </div>
                 <UsuarioEstadoBadge estado={usuario.estado} />
@@ -246,9 +251,16 @@ export const UsuarioTabla = React.memo(function UsuarioTabla({
                           <p className="font-bold text-[12px] text-gray-900 leading-tight">
                             {nombreCompleto}
                           </p>
-                          <p className="text-[10px] text-gray-400 mt-0.5">
-                            ID: {usuario.id.slice(0, 8)}...
-                          </p>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            {usuario.username && (
+                              <span className="text-[10.5px] font-semibold text-[#9B0F06]">
+                                @{usuario.username}
+                              </span>
+                            )}
+                            <span className="text-[9.5px] text-gray-400">
+                              (ID: {usuario.id.slice(0, 8)}...)
+                            </span>
+                          </div>
                         </div>
                       </div>
                     </td>

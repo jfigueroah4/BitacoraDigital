@@ -19,7 +19,7 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: 'Bitácora Digital | VAI - ANCOPIE',
+  title: 'Bitácora Electrónica | Proyecto: Conexion VAS - Hincapie',
   description: 'Sistema de control y consulta de bitácoras de obra en formato PDF con Supabase Storage.',
   icons: {
     icon: '/logo.png',

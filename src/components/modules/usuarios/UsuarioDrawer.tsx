@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   X,
   Save,
@@ -11,18 +11,20 @@ import {
   Shield,
   Lock,
   Briefcase,
-  Calendar,
   MapPin,
   CheckCircle2,
+  AlertCircle,
   Eye,
   EyeOff,
   AtSign,
+  Sparkles,
+  RefreshCw,
 } from 'lucide-react';
 import { Usuario, RolUsuario, EstadoUsuario } from '@/types/usuario';
 import { UsuarioEstadoBadge } from './UsuarioEstadoBadge';
 import { UsuarioRolBadge } from './UsuarioRolBadge';
 import { formatearNombrePropio } from '@/lib/utils/formatters';
-import { showSuccessToast, showErrorToast } from '@/components/ui/Toast';
+import { showErrorToast } from '@/components/ui/Toast';
 
 export type UsuarioDrawerMode = 'create' | 'edit' | 'view';
 
@@ -35,10 +37,26 @@ interface UsuarioDrawerProps {
   onSwitchToEdit?: () => void;
 }
 
-const ROLES_LISTA: RolUsuario[] = [
-  'Administrador',
-  'Usuario',
-];
+const ROLES_LISTA: RolUsuario[] = ['Administrador', 'Usuario'];
+
+// Función para normalizar texto a formato de username (ej. "José Pérez" -> "jperez")
+export function generarUsernameSugerido(nombre: string, apellido: string): string {
+  const normalizar = (str: string) =>
+    str
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '') // Quitar acentos
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, ''); // Solo alfanuméricos
+
+  const n = normalizar(nombre.trim());
+  const a = normalizar(apellido.trim());
+
+  if (n && a) {
+    return `${n.charAt(0)}${a}`;
+  }
+  if (a) return a;
+  return n;
+}
 
 export function UsuarioDrawer({
   isOpen,
@@ -53,6 +71,7 @@ export function UsuarioDrawer({
   const [primerApellido, setPrimerApellido] = useState('');
   const [segundoApellido, setSegundoApellido] = useState('');
   const [username, setUsername] = useState('');
+  const [isUsernameAuto, setIsUsernameAuto] = useState(true);
   const [correo, setCorreo] = useState('');
   const [telefono, setTelefono] = useState('');
   const [cargo, setCargo] = useState('');
@@ -64,6 +83,7 @@ export function UsuarioDrawer({
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [direccion, setDireccion] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     if (usuario) {
@@ -75,6 +95,7 @@ export function UsuarioDrawer({
         usuario.username ||
           (usuario.correo ? usuario.correo.split('@')[0] : '')
       );
+      setIsUsernameAuto(false);
       setCorreo(usuario.correo || '');
       setTelefono(usuario.telefono || '');
       setCargo(usuario.cargo || '');
@@ -89,6 +110,7 @@ export function UsuarioDrawer({
       setPrimerApellido('');
       setSegundoApellido('');
       setUsername('');
+      setIsUsernameAuto(true);
       setCorreo('');
       setTelefono('');
       setCargo('');
@@ -98,16 +120,136 @@ export function UsuarioDrawer({
       setPassword('');
       setConfirmPassword('');
     }
+    setTouched({});
     setShowPassword(false);
     setShowConfirmPassword(false);
   }, [usuario, isOpen, mode]);
+
+  // Actualización automática del username cuando se escribe nombre o apellido
+  const handleNombreChange = (val: string) => {
+    setPrimerNombre(val);
+    if (isUsernameAuto && mode === 'create') {
+      const sugerido = generarUsernameSugerido(val, primerApellido);
+      setUsername(sugerido);
+    }
+  };
+
+  const handleApellidoChange = (val: string) => {
+    setPrimerApellido(val);
+    if (isUsernameAuto && mode === 'create') {
+      const sugerido = generarUsernameSugerido(primerNombre, val);
+      setUsername(sugerido);
+    }
+  };
+
+  const handleRegenerarUsername = () => {
+    const sugerido = generarUsernameSugerido(primerNombre, primerApellido);
+    setUsername(sugerido);
+    setIsUsernameAuto(true);
+  };
+
+  // Validaciones DomunNet
+  const markTouched = (field: string) => {
+    setTouched((prev) => ({ ...prev, [field]: true }));
+  };
+
+  const validPrimerNombre = useMemo(() => {
+    const val = primerNombre.trim();
+    if (!val) return false;
+    return /^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s'-]{2,40}$/.test(val);
+  }, [primerNombre]);
+
+  const validPrimerApellido = useMemo(() => {
+    const val = primerApellido.trim();
+    if (!val) return false;
+    return /^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s'-]{2,40}$/.test(val);
+  }, [primerApellido]);
+
+  const validUsername = useMemo(() => {
+    const val = username.trim();
+    if (!val) return true; // Puede ser opcional, pero si está, debe cumplir formato
+    return /^[a-z0-9._]{3,30}$/.test(val);
+  }, [username]);
+
+  const validCorreo = useMemo(() => {
+    const val = correo.trim();
+    if (!val) return false;
+    return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(val);
+  }, [correo]);
+
+  const validTelefono = useMemo(() => {
+    const val = telefono.trim();
+    if (!val) return true; // Opcional
+    return /^[0-9+()-\s]{7,20}$/.test(val);
+  }, [telefono]);
+
+  // Medidor de fuerza de contraseña
+  const passwordStrength = useMemo(() => {
+    if (!password) return 0;
+    let score = 0;
+    if (password.length >= 6) score += 1;
+    if (password.length >= 8) score += 1;
+    if (/[0-9]/.test(password)) score += 1;
+    if (/[A-Z]/.test(password) || /[^a-zA-Z0-9]/.test(password)) score += 1;
+    return score; // 0 a 4
+  }, [password]);
+
+  const validPassword = useMemo(() => {
+    if (mode === 'create') {
+      return password.length >= 6;
+    }
+    return !password || password.length >= 6;
+  }, [mode, password]);
+
+  const passwordsMatch = useMemo(() => {
+    if (mode === 'create' || password) {
+      return password === confirmPassword && confirmPassword.length > 0;
+    }
+    return true;
+  }, [mode, password, confirmPassword]);
+
+  const isFormValid = useMemo(() => {
+    return (
+      validPrimerNombre &&
+      validPrimerApellido &&
+      validCorreo &&
+      validUsername &&
+      validTelefono &&
+      validPassword &&
+      passwordsMatch
+    );
+  }, [
+    validPrimerNombre,
+    validPrimerApellido,
+    validCorreo,
+    validUsername,
+    validTelefono,
+    validPassword,
+    passwordsMatch,
+  ]);
 
   if (!isOpen) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if ((mode === 'create' || password) && password !== confirmPassword) {
+    if (!validPrimerNombre) {
+      showErrorToast('El primer nombre debe contener al menos 2 letras válidas.');
+      return;
+    }
+    if (!validPrimerApellido) {
+      showErrorToast('El primer apellido debe contener al menos 2 letras válidas.');
+      return;
+    }
+    if (!validCorreo) {
+      showErrorToast('Por favor ingresa un correo electrónico válido.');
+      return;
+    }
+    if (username && !validUsername) {
+      showErrorToast('El nombre de usuario debe tener mínimo 3 caracteres alfanuméricos.');
+      return;
+    }
+    if ((mode === 'create' || password) && !passwordsMatch) {
       showErrorToast('Las contraseñas no coinciden. Por favor verifícalas.');
       return;
     }
@@ -119,8 +261,8 @@ export function UsuarioDrawer({
         segundo_nombre: segundoNombre.trim() || null,
         primer_apellido: primerApellido.trim(),
         segundo_apellido: segundoApellido.trim() || null,
-        username: username.trim().toLowerCase() || null,
-        correo: correo.trim(),
+        username: username.trim().toLowerCase() || generarUsernameSugerido(primerNombre, primerApellido),
+        correo: correo.trim().toLowerCase(),
         telefono: telefono.trim(),
         cargo: cargo.trim() || 'Colaborador',
         rol,
@@ -165,7 +307,7 @@ export function UsuarioDrawer({
               </h3>
               <p className="text-[10px] text-gray-500">
                 {isCreate
-                  ? 'Registra un nuevo usuario con acceso directo'
+                  ? 'Registra un nuevo usuario con validaciones DomunNet y acceso seguro'
                   : isEdit
                   ? `Modificando información de ${nombreCompleto}`
                   : `Visualización de cuenta de usuario`}
@@ -195,7 +337,7 @@ export function UsuarioDrawer({
                   <h4 className="text-sm font-bold text-gray-900">{nombreCompleto}</h4>
                   <p className="text-xs text-gray-500">{usuario.correo}</p>
                   {usuario.username && (
-                    <p className="text-[11px] text-gray-400 font-medium">@{usuario.username}</p>
+                    <p className="text-[11px] text-[#9B0F06] font-semibold">@{usuario.username}</p>
                   )}
                   <div className="flex items-center gap-2 mt-1">
                     <UsuarioRolBadge rol={usuario.rol} />
@@ -218,21 +360,38 @@ export function UsuarioDrawer({
 
           {/* Formulario */}
           <form id="usuario-form" onSubmit={handleSubmit} className="space-y-4">
-            {/* Nombres */}
+            {/* Nombres con validación DomunNet */}
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="text-[11px] font-bold text-gray-700 block mb-1">
                   Primer Nombre <span className="text-red-500">*</span>
                 </label>
-                <input
-                  type="text"
-                  placeholder="Ej. Daniel"
-                  value={primerNombre}
-                  onChange={(e) => setPrimerNombre(e.target.value)}
-                  disabled={isView}
-                  required
-                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-800 outline-none focus:border-[#9B0F06] disabled:bg-gray-100/60 disabled:text-gray-600"
-                />
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="Ej. Daniel"
+                    value={primerNombre}
+                    onChange={(e) => handleNombreChange(e.target.value)}
+                    onBlur={() => markTouched('primerNombre')}
+                    disabled={isView}
+                    required
+                    className={`w-full px-3 py-2 bg-gray-50 border rounded-xl text-xs text-gray-800 outline-none transition-colors disabled:bg-gray-100/60 disabled:text-gray-600 ${
+                      touched.primerNombre && !validPrimerNombre
+                        ? 'border-red-400 focus:border-red-500 bg-red-50/20'
+                        : touched.primerNombre && validPrimerNombre
+                        ? 'border-emerald-500 focus:border-emerald-500'
+                        : 'border-gray-200 focus:border-[#9B0F06]'
+                    }`}
+                  />
+                  {touched.primerNombre && validPrimerNombre && (
+                    <CheckCircle2 size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-emerald-600" />
+                  )}
+                </div>
+                {touched.primerNombre && !validPrimerNombre && (
+                  <p className="text-[10px] text-red-500 mt-1 flex items-center gap-1">
+                    <AlertCircle size={11} /> Solo letras, mín. 2 caracteres
+                  </p>
+                )}
               </div>
 
               <div>
@@ -250,21 +409,38 @@ export function UsuarioDrawer({
               </div>
             </div>
 
-            {/* Apellidos */}
+            {/* Apellidos con validación DomunNet */}
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="text-[11px] font-bold text-gray-700 block mb-1">
                   Primer Apellido <span className="text-red-500">*</span>
                 </label>
-                <input
-                  type="text"
-                  placeholder="Ej. Figueroa"
-                  value={primerApellido}
-                  onChange={(e) => setPrimerApellido(e.target.value)}
-                  disabled={isView}
-                  required
-                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-800 outline-none focus:border-[#9B0F06] disabled:bg-gray-100/60 disabled:text-gray-600"
-                />
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="Ej. Figueroa"
+                    value={primerApellido}
+                    onChange={(e) => handleApellidoChange(e.target.value)}
+                    onBlur={() => markTouched('primerApellido')}
+                    disabled={isView}
+                    required
+                    className={`w-full px-3 py-2 bg-gray-50 border rounded-xl text-xs text-gray-800 outline-none transition-colors disabled:bg-gray-100/60 disabled:text-gray-600 ${
+                      touched.primerApellido && !validPrimerApellido
+                        ? 'border-red-400 focus:border-red-500 bg-red-50/20'
+                        : touched.primerApellido && validPrimerApellido
+                        ? 'border-emerald-500 focus:border-emerald-500'
+                        : 'border-gray-200 focus:border-[#9B0F06]'
+                    }`}
+                  />
+                  {touched.primerApellido && validPrimerApellido && (
+                    <CheckCircle2 size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-emerald-600" />
+                  )}
+                </div>
+                {touched.primerApellido && !validPrimerApellido && (
+                  <p className="text-[10px] text-red-500 mt-1 flex items-center gap-1">
+                    <AlertCircle size={11} /> Solo letras, mín. 2 caracteres
+                  </p>
+                )}
               </div>
 
               <div>
@@ -282,59 +458,126 @@ export function UsuarioDrawer({
               </div>
             </div>
 
-            {/* Nombre de Usuario y Correo Electrónico */}
-            <div className="space-y-3">
-              <div>
-                <label className="text-[11px] font-bold text-gray-700 block mb-1">
-                  Nombre de Usuario <span className="text-gray-400 font-normal">(Login con usuario)</span>
+            {/* Generación Automática de Username (estilo DomunNet) */}
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-[11px] font-bold text-gray-700 flex items-center gap-1.5">
+                  <span>Nombre de Usuario</span>
+                  {isUsernameAuto && !isView && (
+                    <span className="text-[9px] bg-amber-50 text-amber-700 font-semibold px-1.5 py-0.5 rounded border border-amber-200/60">
+                      Auto
+                    </span>
+                  )}
                 </label>
-                <div className="relative">
-                  <AtSign size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                  <input
-                    type="text"
-                    placeholder="ej. danielfigueroa"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/\s+/g, ''))}
-                    disabled={isView}
-                    className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-800 outline-none focus:border-[#9B0F06] disabled:bg-gray-100/60 disabled:text-gray-600"
-                  />
-                </div>
+                {!isView && (
+                  <button
+                    type="button"
+                    onClick={handleRegenerarUsername}
+                    disabled={!primerNombre && !primerApellido}
+                    title="Generar username a partir del nombre y apellido"
+                    className="inline-flex items-center gap-1 text-[10px] font-semibold text-[#9B0F06] hover:text-[#5E0006] transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    <Sparkles size={11} />
+                    <span>Autogenerar</span>
+                  </button>
+                )}
               </div>
+              <div className="relative">
+                <AtSign size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="ej. dfigueroa"
+                  value={username}
+                  onChange={(e) => {
+                    setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9._]/g, ''));
+                    setIsUsernameAuto(false);
+                  }}
+                  onBlur={() => markTouched('username')}
+                  disabled={isView}
+                  className={`w-full pl-9 pr-8 py-2 bg-gray-50 border rounded-xl text-xs text-gray-800 outline-none transition-colors disabled:bg-gray-100/60 disabled:text-gray-600 font-mono ${
+                    touched.username && !validUsername
+                      ? 'border-red-400 focus:border-red-500 bg-red-50/20'
+                      : touched.username && validUsername && username
+                      ? 'border-emerald-500 focus:border-emerald-500'
+                      : 'border-gray-200 focus:border-[#9B0F06]'
+                  }`}
+                />
+                {username && validUsername && (
+                  <CheckCircle2 size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-emerald-600" />
+                )}
+              </div>
+              {username && !validUsername && (
+                <p className="text-[10px] text-red-500 mt-1 flex items-center gap-1">
+                  <AlertCircle size={11} /> Mínimo 3 caracteres (solo letras minúsculas, números, punto o guión bajo)
+                </p>
+              )}
+              {username && validUsername && isCreate && (
+                <p className="text-[10px] text-gray-400 mt-0.5">
+                  Podrá iniciar sesión escribiendo <span className="font-semibold text-gray-600 font-mono">@{username}</span>
+                </p>
+              )}
+            </div>
 
-              <div>
-                <label className="text-[11px] font-bold text-gray-700 block mb-1">
-                  Correo Electrónico <span className="text-red-500">*</span>
-                </label>
-                <div className="relative">
-                  <Mail size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                  <input
-                    type="email"
-                    placeholder="usuario@bitacoradigital.com"
-                    value={correo}
-                    onChange={(e) => setCorreo(e.target.value)}
-                    disabled={isView}
-                    required
-                    className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-800 outline-none focus:border-[#9B0F06] disabled:bg-gray-100/60 disabled:text-gray-600"
-                  />
-                </div>
+            {/* Correo Electrónico con validación DomunNet */}
+            <div>
+              <label className="text-[11px] font-bold text-gray-700 block mb-1">
+                Correo Electrónico <span className="text-red-500">*</span>
+              </label>
+              <div className="relative">
+                <Mail size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                  type="email"
+                  placeholder="usuario@bitacoradigital.com"
+                  value={correo}
+                  onChange={(e) => setCorreo(e.target.value)}
+                  onBlur={() => markTouched('correo')}
+                  disabled={isView}
+                  required
+                  className={`w-full pl-9 pr-8 py-2 bg-gray-50 border rounded-xl text-xs text-gray-800 outline-none transition-colors disabled:bg-gray-100/60 disabled:text-gray-600 ${
+                    touched.correo && !validCorreo
+                      ? 'border-red-400 focus:border-red-500 bg-red-50/20'
+                      : touched.correo && validCorreo
+                      ? 'border-emerald-500 focus:border-emerald-500'
+                      : 'border-gray-200 focus:border-[#9B0F06]'
+                  }`}
+                />
+                {touched.correo && validCorreo && (
+                  <CheckCircle2 size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-emerald-600" />
+                )}
               </div>
+              {touched.correo && !validCorreo && (
+                <p className="text-[10px] text-red-500 mt-1 flex items-center gap-1">
+                  <AlertCircle size={11} /> Formato de correo electrónico inválido
+                </p>
+              )}
+            </div>
 
-              <div>
-                <label className="text-[11px] font-bold text-gray-700 block mb-1">
-                  Teléfono / WhatsApp
-                </label>
-                <div className="relative">
-                  <Phone size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                  <input
-                    type="text"
-                    placeholder="+502 5555 9901"
-                    value={telefono}
-                    onChange={(e) => setTelefono(e.target.value)}
-                    disabled={isView}
-                    className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-800 outline-none focus:border-[#9B0F06] disabled:bg-gray-100/60 disabled:text-gray-600"
-                  />
-                </div>
+            {/* Teléfono / WhatsApp */}
+            <div>
+              <label className="text-[11px] font-bold text-gray-700 block mb-1">
+                Teléfono / WhatsApp
+              </label>
+              <div className="relative">
+                <Phone size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="+502 5555 9901"
+                  value={telefono}
+                  onChange={(e) => setTelefono(e.target.value)}
+                  onBlur={() => markTouched('telefono')}
+                  disabled={isView}
+                  className={`w-full pl-9 pr-3 py-2 bg-gray-50 border rounded-xl text-xs text-gray-800 outline-none transition-colors disabled:bg-gray-100/60 disabled:text-gray-600 ${
+                    touched.telefono && !validTelefono
+                      ? 'border-red-400 focus:border-red-500'
+                      : 'border-gray-200 focus:border-[#9B0F06]'
+                  }`}
+                />
               </div>
+              {touched.telefono && !validTelefono && (
+                <p className="text-[10px] text-red-500 mt-1 flex items-center gap-1">
+                  <AlertCircle size={11} /> Ingresa un número telefónico válido (mín. 8 dígitos)
+                </p>
+              )}
             </div>
 
             {/* Rol y Estado */}
@@ -392,14 +635,14 @@ export function UsuarioDrawer({
               </div>
             </div>
 
-            {/* Contraseña y Verificación (Solo en creación o edición) */}
+            {/* Contraseña con Medidor de Fuerza DomunNet (Solo creación o edición) */}
             {!isView && (
               <div className="space-y-3 p-3.5 bg-gray-50 rounded-xl border border-gray-200/70">
                 <div>
                   <label className="text-[11px] font-bold text-gray-700 block mb-1">
                     {isCreate ? (
                       <>
-                        Contraseña <span className="text-red-500">*</span>
+                        Contraseña de Acceso <span className="text-red-500">*</span>
                       </>
                     ) : (
                       'Nueva Contraseña (Opcional)'
@@ -412,6 +655,7 @@ export function UsuarioDrawer({
                       placeholder={isCreate ? 'Mínimo 6 caracteres' : 'Dejar en blanco para conservar actual'}
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
+                      onBlur={() => markTouched('password')}
                       required={isCreate}
                       className="w-full pl-9 pr-9 py-2 bg-white border border-gray-200 rounded-xl text-xs text-gray-800 outline-none focus:border-[#9B0F06]"
                     />
@@ -425,6 +669,47 @@ export function UsuarioDrawer({
                       {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
                     </button>
                   </div>
+
+                  {/* Medidor de seguridad */}
+                  {password && (
+                    <div className="mt-2 space-y-1">
+                      <div className="flex items-center gap-1 h-1.5 w-full bg-gray-200 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full transition-all duration-300 ${
+                            passwordStrength <= 1
+                              ? 'w-1/4 bg-red-500'
+                              : passwordStrength === 2
+                              ? 'w-2/4 bg-amber-500'
+                              : passwordStrength === 3
+                              ? 'w-3/4 bg-blue-500'
+                              : 'w-full bg-emerald-500'
+                          }`}
+                        />
+                      </div>
+                      <div className="flex items-center justify-between text-[10px]">
+                        <span className="text-gray-500">Nivel de seguridad:</span>
+                        <span
+                          className={`font-semibold ${
+                            passwordStrength <= 1
+                              ? 'text-red-600'
+                              : passwordStrength === 2
+                              ? 'text-amber-600'
+                              : passwordStrength === 3
+                              ? 'text-blue-600'
+                              : 'text-emerald-600'
+                          }`}
+                        >
+                          {passwordStrength <= 1
+                            ? 'Débil (mín. 6 caracteres)'
+                            : passwordStrength === 2
+                            ? 'Aceptable'
+                            : passwordStrength === 3
+                            ? 'Buena'
+                            : 'Muy Fuerte'}
+                        </span>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div>
@@ -438,10 +723,13 @@ export function UsuarioDrawer({
                       placeholder="Repite la contraseña para verificar"
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
+                      onBlur={() => markTouched('confirmPassword')}
                       required={isCreate || Boolean(password)}
                       className={`w-full pl-9 pr-9 py-2 bg-white border rounded-xl text-xs text-gray-800 outline-none transition-colors ${
-                        confirmPassword && password !== confirmPassword
+                        confirmPassword && !passwordsMatch
                           ? 'border-red-400 focus:border-red-500'
+                          : confirmPassword && passwordsMatch
+                          ? 'border-emerald-500 focus:border-emerald-500'
                           : 'border-gray-200 focus:border-[#9B0F06]'
                       }`}
                     />
@@ -456,14 +744,14 @@ export function UsuarioDrawer({
                     </button>
                   </div>
 
-                  {confirmPassword && password !== confirmPassword && (
+                  {confirmPassword && !passwordsMatch && (
                     <p className="text-[10px] text-red-600 mt-1.5 flex items-center gap-1 font-medium">
-                      <span>✕</span> Las contraseñas no coinciden
+                      <AlertCircle size={11} /> Las contraseñas no coinciden
                     </p>
                   )}
-                  {confirmPassword && password === confirmPassword && (
+                  {confirmPassword && passwordsMatch && (
                     <p className="text-[10px] text-emerald-600 mt-1.5 flex items-center gap-1 font-medium">
-                      <span>✓</span> Las contraseñas coinciden correctamente
+                      <CheckCircle2 size={11} /> Las contraseñas coinciden correctamente
                     </p>
                   )}
                 </div>
@@ -492,7 +780,7 @@ export function UsuarioDrawer({
               <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center gap-2 text-[11px] text-emerald-800">
                 <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
                 <span>
-                  El usuario podrá iniciar sesión inmediatamente con su correo o nombre de usuario.
+                  El usuario se registrará con perfil activo y podrá ingresar mediante correo o nombre de usuario.
                 </span>
               </div>
             )}
@@ -513,8 +801,8 @@ export function UsuarioDrawer({
             <button
               type="submit"
               form="usuario-form"
-              disabled={isSubmitting || (Boolean(password) && password !== confirmPassword)}
-              className="inline-flex items-center gap-2 px-5 py-2 rounded-xl bg-[#9B0F06] hover:bg-[#5E0006] text-white text-xs font-bold transition-all shadow-sm active:scale-95 disabled:opacity-50 cursor-pointer"
+              disabled={isSubmitting || !isFormValid}
+              className="inline-flex items-center gap-2 px-5 py-2 rounded-xl bg-[#9B0F06] hover:bg-[#5E0006] text-white text-xs font-bold transition-all shadow-sm active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
             >
               <Save size={14} />
               <span>{isSubmitting ? 'Guardando...' : 'Guardar Usuario'}</span>

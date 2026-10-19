@@ -259,7 +259,7 @@ export default function DashboardPage() {
     <div className="min-h-screen bg-[#F3F4F7] text-[#07152B] flex flex-col font-poppins selection:bg-[#3B2219] selection:text-white">
       {/* TopBar with brand, search bar, clickable book logo to return home */}
       <TopBar
-        bitacoraNombre="BITÁCORA VAI - ANCOPIE"
+        bitacoraNombre="Proyecto: Conexion VAS - Hincapie"
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         userProfile={userProfile}

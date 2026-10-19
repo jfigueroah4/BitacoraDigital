@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
@@ -448,7 +448,7 @@ Mensaje despachado al teléfono ${telefonoEnvio.trim()}:
 
   return (
     <div className="min-h-screen bg-[#F3F4F7] text-[#07152B] flex flex-col font-poppins selection:bg-[#3B2219] selection:text-white">
-      <TopBar bitacoraNombre="BITÁCORA VAI - ANCOPIE • TICKETS" />
+      <TopBar bitacoraNombre="Proyecto: Conexion VAS - Hincapie • TICKETS" />
 
       <main className="flex-1 w-full max-w-7xl mx-auto p-4 sm:p-6 lg:p-8 flex flex-col space-y-4">
         {/* Header con botón Volver y Crear Ticket */}

@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
@@ -100,59 +100,101 @@ export default function UsuariosPage() {
   const [usuarioEliminar, setUsuarioEliminar] = useState<Usuario | undefined>();
   const [modoModalEliminar, setModoModalEliminar] = useState<'todos' | 'activar' | 'eliminar' | 'suspender'>('todos');
 
-  // Cargar usuarios de Supabase
+  // Cargar usuarios de Supabase, API y localStorage asegurando persistencia completa
   const cargarUsuarios = useCallback(async () => {
     try {
       setLoading(true);
-      if (supabase) {
-        const { data, error } = await supabase
-          .from('perfil_usuario')
-          .select('*, usuario(*, rol(*))');
 
-        if (!error && data && data.length > 0) {
-          const mapeados: Usuario[] = data.map((item: any) => {
-            const pNombre = item.primer_nombre || (item.nombre_completo ? item.nombre_completo.split(' ')[0] : 'Usuario');
-            const pApellido = item.primer_apellido || (item.nombre_completo ? item.nombre_completo.split(' ').slice(1).join(' ') : '');
-            return {
-              id: item.usuario_id || item.id,
-              primer_nombre: pNombre,
-              primer_apellido: pApellido,
-              nombre: item.nombre_completo || `${pNombre} ${pApellido}`.trim(),
-              correo: item.usuario?.correo || item.correo || 'usuario@bitacoradigital.com',
-              rol: item.usuario?.rol?.nombre_rol || item.rol || 'Usuario',
-              estado: (item.usuario?.estado || 'Activo') as EstadoUsuario,
-              cargo: item.cargo_puesto || 'Colaborador',
-              telefono: item.telefono || '',
-              fechaCreacion: item.created_at ? item.created_at.slice(0, 10) : '2026-01-01',
-              direccion: item.direccion || '',
-            };
-          });
-
-          // Combinar con base sin duplicar correos
-          const emailsSet = new Set(mapeados.map((m) => m.correo.toLowerCase()));
-          const combinados = [
-            ...mapeados,
-            ...USUARIOS_BASE.filter((b) => !emailsSet.has(b.correo.toLowerCase())),
-          ];
-          setUsuarios(combinados);
-          localStorage.setItem('bitacora_usuarios_lista', JSON.stringify(combinados));
-          return;
+      // 1. Obtener usuarios locales existentes en localStorage
+      let usuariosLocales: Usuario[] = [];
+      try {
+        const stored = localStorage.getItem('bitacora_usuarios_lista');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed)) {
+            usuariosLocales = parsed;
+          }
         }
+      } catch (_) {}
+
+      let mapeados: Usuario[] = [];
+
+      // 2. Intentar cargar desde Supabase DB o API
+      if (supabase) {
+        try {
+          const { data, error } = await supabase
+            .from('perfil_usuario')
+            .select('*, usuario(*, rol(*))');
+
+          if (!error && data && data.length > 0) {
+            mapeados = data.map((item: any) => {
+              const pNombre = item.primer_nombre || (item.nombre_completo ? item.nombre_completo.split(' ')[0] : 'Usuario');
+              const pApellido = item.primer_apellido || (item.nombre_completo ? item.nombre_completo.split(' ').slice(1).join(' ') : '');
+              return {
+                id: item.usuario_id || item.id,
+                primer_nombre: pNombre,
+                primer_apellido: pApellido,
+                username: item.username || item.usuario?.username || `${pNombre[0] || ''}${pApellido || ''}`.toLowerCase().replace(/[^a-z0-9]/g, ''),
+                nombre: item.nombre_completo || `${pNombre} ${pApellido}`.trim(),
+                correo: item.usuario?.correo || item.correo || 'usuario@bitacoradigital.com',
+                rol: item.usuario?.rol?.nombre_rol || item.rol || 'Usuario',
+                estado: (item.usuario?.estado || 'Activo') as EstadoUsuario,
+                cargo: item.cargo_puesto || 'Colaborador',
+                telefono: item.telefono || '',
+                fechaCreacion: item.created_at ? item.created_at.slice(0, 10) : '2026-01-01',
+                direccion: item.direccion || '',
+              };
+            });
+          }
+        } catch (_) {}
       }
 
-      // Fallback local
+      // 3. Fusión sin pérdida: 
+      // Prioridad: Datos DB -> Usuarios locales (creados en cliente) -> Usuarios base demo
+      const emailsVistos = new Set<string>();
+      const combinados: Usuario[] = [];
+
+      // A) Usuarios de DB
+      mapeados.forEach((u) => {
+        const key = u.correo.toLowerCase();
+        if (!emailsVistos.has(key)) {
+          emailsVistos.add(key);
+          combinados.push(u);
+        }
+      });
+
+      // B) Usuarios locales (para que NUNCA desaparezcan al recargar la página o el servidor)
+      usuariosLocales.forEach((u) => {
+        const key = u.correo.toLowerCase();
+        if (!emailsVistos.has(key)) {
+          emailsVistos.add(key);
+          combinados.push(u);
+        }
+      });
+
+      // C) Usuarios base demo que no estén ya en la lista
+      USUARIOS_BASE.forEach((u) => {
+        const key = u.correo.toLowerCase();
+        if (!emailsVistos.has(key)) {
+          emailsVistos.add(key);
+          combinados.push(u);
+        }
+      });
+
+      setUsuarios(combinados);
+      localStorage.setItem('bitacora_usuarios_lista', JSON.stringify(combinados));
+    } catch (_) {
+      // Fallback si ocurre alguna excepción no controlada
       const stored = localStorage.getItem('bitacora_usuarios_lista');
       if (stored) {
         try {
           const parsed = JSON.parse(stored);
           if (Array.isArray(parsed) && parsed.length > 0) {
             setUsuarios(parsed);
-            return;
           }
         } catch (_) {}
       }
-    } catch (_) {}
-    finally {
+    } finally {
       setLoading(false);
     }
   }, []);
@@ -238,6 +280,7 @@ export default function UsuariosPage() {
               segundo_nombre: sNombre || null,
               primer_apellido: pApellido,
               segundo_apellido: sApellido || null,
+              username: payload.username || u.username || null,
               nombre: nombreCompleto,
               correo: payload.correo,
               telefono: payload.telefono,
@@ -272,19 +315,21 @@ export default function UsuariosPage() {
         // Crear nuevo
         let newId = `user-${Date.now()}`;
 
-        if (supabaseAdmin) {
-          try {
-            const { data: adminUser } = await supabaseAdmin.auth.admin.createUser({
-              email: payload.correo,
-              password: payload.password || 'mariobros25',
-              email_confirm: true,
-              user_metadata: {
-                nombre_completo: nombreCompleto,
-                rol: payload.rol,
-              },
-            });
-            if (adminUser?.user) newId = adminUser.user.id;
-          } catch (_) {}
+        // Intentar registrar mediante API backend con Service Role
+        try {
+          const res = await fetch('/api/usuarios', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+          if (res.ok) {
+            const data = await res.json();
+            if (data?.usuario?.id) {
+              newId = data.usuario.id;
+            }
+          }
+        } catch (apiErr) {
+          console.warn('Registro offline/local:', apiErr);
         }
 
         const nuevoUserObj: Usuario = {
@@ -293,6 +338,7 @@ export default function UsuariosPage() {
           segundo_nombre: sNombre || null,
           primer_apellido: pApellido,
           segundo_apellido: sApellido || null,
+          username: payload.username || `${pNombre[0] || ''}${pApellido || ''}`.toLowerCase().replace(/[^a-z0-9]/g, ''),
           nombre: nombreCompleto,
           correo: payload.correo,
           telefono: payload.telefono,
@@ -303,7 +349,9 @@ export default function UsuariosPage() {
           fechaCreacion: new Date().toISOString().slice(0, 10),
         };
 
-        const actualizados = [nuevoUserObj, ...usuarios];
+        // Guardar sin duplicar
+        const sinDuplicados = usuarios.filter((u) => u.correo.toLowerCase() !== nuevoUserObj.correo.toLowerCase());
+        const actualizados = [nuevoUserObj, ...sinDuplicados];
         setUsuarios(actualizados);
         localStorage.setItem('bitacora_usuarios_lista', JSON.stringify(actualizados));
         showSuccessToast('Usuario creado exitosamente');
@@ -356,7 +404,7 @@ export default function UsuariosPage() {
 
   return (
     <div className="min-h-screen bg-[#F3F4F7] text-[#07152B] flex flex-col font-poppins selection:bg-[#3B2219] selection:text-white">
-      <TopBar bitacoraNombre="BITÁCORA VAI - ANCOPIE • USUARIOS" />
+      <TopBar bitacoraNombre="Proyecto: Conexion VAS - Hincapie • USUARIOS" />
 
       <main className="flex-1 w-full max-w-7xl mx-auto p-4 sm:p-6 lg:p-8 space-y-4">
         {/* Sticky Encabezado con Botones como en DomunNet */}

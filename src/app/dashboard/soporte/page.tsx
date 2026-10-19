@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import React from 'react';
 import { ArrowLeft, Mail, GraduationCap, Phone } from 'lucide-react';
@@ -20,7 +20,7 @@ export default function SoportePage() {
 
   return (
     <div className="min-h-screen bg-[#F3F4F7] text-[#07152B] flex flex-col font-poppins selection:bg-[#3B2219] selection:text-white">
-      <TopBar bitacoraNombre="BITÁCORA VAI - ANCOPIE • SOPORTE" />
+      <TopBar bitacoraNombre="Proyecto: Conexion VAS - Hincapie • SOPORTE" />
 
       <main className="flex-1 w-full max-w-6xl mx-auto p-4 sm:p-6 lg:p-8 flex flex-col justify-center">
         {/* Header con botón Volver */}
@@ -35,7 +35,7 @@ export default function SoportePage() {
           </button>
           <div>
             <h1 className="text-xl sm:text-2xl font-black text-gray-900 tracking-tight">
-              Soporte Técnico &bull; Bitácora Digital
+              Soporte Técnico &bull; Bitácora Electrónica
             </h1>
             <p className="text-xs text-gray-500 font-medium">
               Información institucional y contacto del desarrollador del sistema
