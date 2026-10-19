@@ -19,7 +19,7 @@ export function UsuarioDeleteModal({
   usuario,
   modoModal = 'todos',
 }: UsuarioDeleteModalProps) {
-  const isSuspended = usuario?.estado === 'Suspendido' || (usuario as any)?.activo === false;
+  const isSuspended = usuario?.estado === 'Suspendido' || usuario?.estado === 'Inactivo' || (usuario as any)?.activo === false;
   const nombreCompleto = usuario?.nombre || `${usuario?.primer_nombre || ''} ${usuario?.primer_apellido || ''}`.trim() || 'Usuario';
 
   return (

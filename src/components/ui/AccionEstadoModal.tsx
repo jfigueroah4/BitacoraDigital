@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import React from 'react';
 import { Trash2, X, CheckCircle, PowerOff, UserX } from 'lucide-react';
@@ -84,6 +84,8 @@ export function AccionEstadoModal({
               ? `Confirmas reactivar el acceso para `
               : esModoEliminar
               ? `Confirmas eliminar definitivamente a `
+              : esModoSuspender
+              ? `Confirmas inactivar temporalmente a `
               : `Selecciona la acción que deseas realizar para `}
             <span className="font-semibold text-gray-800">{nombreItem}</span>.
           </p>
@@ -111,7 +113,7 @@ export function AccionEstadoModal({
                 <Trash2 size={16} />
                 <span>Eliminar definitivamente</span>
               </button>
-            ) : !isSuspended ? (
+            ) : (esModoSuspender || !isSuspended) ? (
               <button
                 onClick={() => onConfirm('suspender')}
                 className="w-full flex items-center justify-center gap-2 rounded-xl py-3 sm:py-2.5 text-sm sm:text-[12px] font-semibold text-white transition-colors bg-[#3B2219] hover:bg-[#2A1710] cursor-pointer shadow-xs active:scale-95"

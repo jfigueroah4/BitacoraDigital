@@ -1,9 +1,20 @@
 'use client';
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { X, UploadCloud, FileText, CheckCircle, AlertTriangle, ShieldCheck, Loader2, Calendar } from 'lucide-react';
+import {
+  X,
+  UploadCloud,
+  FileText,
+  CheckCircle,
+  AlertTriangle,
+  ShieldCheck,
+  Loader2,
+  Calendar,
+  Info,
+  Clock,
+} from 'lucide-react';
 import { DocumentoBitacora } from '@/types/bitacora';
-import { MESES_NOMBRES, getDiasEnMes } from '@/lib/mockData';
+import { MESES_NOMBRES, getDiasEnMes, DuracionProyecto } from '@/lib/mockData';
 import { subirDocumentoBitacora, formatearBytes } from '@/lib/supabase/storage';
 import { showSuccessToast, showErrorToast } from '@/components/ui/Toast';
 
@@ -16,6 +27,7 @@ interface SubirDocumentoModalProps {
   usuarioNombre: string;
   onDocumentoSubido: (doc: DocumentoBitacora) => void;
   documentosExistentes?: DocumentoBitacora[];
+  duracionProyecto?: DuracionProyecto;
 }
 
 export default function SubirDocumentoModal({
@@ -27,6 +39,7 @@ export default function SubirDocumentoModal({
   usuarioNombre,
   onDocumentoSubido,
   documentosExistentes = [],
+  duracionProyecto,
 }: SubirDocumentoModalProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [dia, setDia] = useState<number>(diaSugerido);
@@ -39,14 +52,23 @@ export default function SubirDocumentoModal({
   const [mostrarConfirmacion, setMostrarConfirmacion] = useState(false);
   const [subiendo, setSubiendo] = useState(false);
 
-  // Días que ya cuentan con un folio registrado en el mes y año seleccionados
-  const diasOcupados = useMemo(() => {
-    return new Set(
-      (documentosExistentes || [])
-        .filter((d) => d.mes === mes && d.anio === anio)
-        .map((d) => d.dia)
-    );
+  // Documentos que ya existen en el mes y año seleccionados
+  const docsEnMes = useMemo(() => {
+    return (documentosExistentes || []).filter((d) => d.mes === mes && d.anio === anio);
   }, [documentosExistentes, mes, anio]);
+
+  const docExistenteEnDia = useMemo(() => {
+    return docsEnMes.find((d) => d.dia === dia) || null;
+  }, [docsEnMes, dia]);
+
+  // Validar si la fecha está dentro de la duración establecida del proyecto
+  const fueraDeDuracion = useMemo(() => {
+    if (!duracionProyecto) return false;
+    const { anioInicio, mesInicio, anioFin, mesFin } = duracionProyecto;
+    if (anio < anioInicio || (anio === anioInicio && mes < mesInicio)) return true;
+    if (anio > anioFin || (anio === anioFin && mes > mesFin)) return true;
+    return false;
+  }, [duracionProyecto, mes, anio]);
 
   // Sincronizar fecha sugerida (por defecto la fecha de hoy) al abrir el modal
   useEffect(() => {
@@ -55,10 +77,14 @@ export default function SubirDocumentoModal({
       setDia(diaSugerido ?? hoy.getDate());
       setMes(mesSugerido ?? (hoy.getMonth() + 1));
       setAnio(anioSugerido ?? hoy.getFullYear());
+      setArchivo(null);
+      setTitulo('');
+      setDescripcion('');
+      setMostrarConfirmacion(false);
     }
   }, [isOpen, diaSugerido, mesSugerido, anioSugerido]);
 
-  // Handle escape key
+  // Manejo de tecla Escape
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && isOpen && !subiendo) {
@@ -72,6 +98,20 @@ export default function SubirDocumentoModal({
   if (!isOpen) return null;
 
   const diasEnMesActual = getDiasEnMes(mes, anio);
+
+  // Años disponibles basados en el proyecto
+  const aniosDisponibles = useMemo(() => {
+    if (!duracionProyecto) {
+      return [2024, 2025, 2026, 2027, 2028, 2029, 2030];
+    }
+    const min = Math.min(duracionProyecto.anioInicio, 2024);
+    const max = Math.max(duracionProyecto.anioFin, 2030);
+    const lista: number[] = [];
+    for (let y = min; y <= max; y++) {
+      lista.push(y);
+    }
+    return lista;
+  }, [duracionProyecto]);
 
   const handleFileSelect = (file: File) => {
     if (!file.name.toLowerCase().endsWith('.pdf') && file.type !== 'application/pdf') {
@@ -95,10 +135,6 @@ export default function SubirDocumentoModal({
 
   const handleValidarAntesDeConfirmar = (e: React.FormEvent) => {
     e.preventDefault();
-    if (diasOcupados.has(dia)) {
-      showErrorToast(`El día ${dia} ya cuenta con un folio registrado. Selecciona un día libre.`);
-      return;
-    }
     if (!archivo) {
       showErrorToast('Debes adjuntar el documento PDF de la bitácora.');
       return;
@@ -127,7 +163,11 @@ export default function SubirDocumentoModal({
       });
 
       onDocumentoSubido(nuevoDoc);
-      showSuccessToast(`¡Bitácora del día ${dia} de ${MESES_NOMBRES[mes - 1]} subida exitosamente!`);
+      showSuccessToast(
+        docExistenteEnDia
+          ? `¡Folio del día ${dia} de ${MESES_NOMBRES[mes - 1]} actualizado exitosamente!`
+          : `¡Bitácora del día ${dia} de ${MESES_NOMBRES[mes - 1]} subida exitosamente!`
+      );
       // Limpiar y cerrar
       setArchivo(null);
       setTitulo('');
@@ -142,26 +182,25 @@ export default function SubirDocumentoModal({
     }
   };
 
-  const pesoBytes = archivo ? archivo.size : 0;
-  const esPesoOptimo = pesoBytes <= 150 * 1024; // <= 150 KB (~100 KB objetivo)
-  const esPesoAceptable = pesoBytes > 150 * 1024 && pesoBytes <= 2 * 1024 * 1024; // <= 2 MB
+  const esPesoOptimo = archivo && archivo.size <= 500 * 1024;
+  const esPesoAceptable = archivo && archivo.size <= 2 * 1024 * 1024;
 
   return (
     <>
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-black/40 backdrop-blur-xs z-50 transition-opacity"
+        className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs transition-opacity animate-fadeIn"
         onClick={() => {
           if (!subiendo) onClose();
         }}
       />
 
-      {/* Drawer Panel lateral */}
+      {/* Drawer Lateral */}
       <div className="fixed inset-y-0 right-0 z-50 w-full max-w-md bg-white shadow-2xl flex flex-col font-poppins animate-slideInRight border-l border-gray-100">
         {/* Header del Drawer */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 bg-gray-50/80 shrink-0">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-[#F4ECE6] flex items-center justify-center text-[#3B2219]">
+            <div className="w-8 h-8 rounded-lg bg-[#3B2219]/10 flex items-center justify-center text-[#3B2219]">
               <UploadCloud size={18} />
             </div>
             <div>
@@ -184,19 +223,19 @@ export default function SubirDocumentoModal({
           </button>
         </div>
 
-        {/* Content del Drawer */}
+        {/* Content del Drawer con Scroll */}
         <div className="flex-1 overflow-y-auto p-5 space-y-4">
           {!mostrarConfirmacion ? (
             <form id="drawer-subir-form" onSubmit={handleValidarAntesDeConfirmar} className="space-y-4">
-              {/* Fecha Selector en orden: DÍA, MES, AÑO */}
+              {/* 1. SELECCIÓN DE FECHA EN ORDEN: DÍA, MES, AÑO */}
               <div>
-                <label className="text-[11px] font-bold text-gray-700 flex items-center gap-1 mb-1.5">
+                <label className="text-[11px] font-bold text-gray-700 flex items-center gap-1.5 mb-1.5">
                   <Calendar size={13} className="text-[#3B2219]" />
-                  <span>Fecha de registro (Día, Mes, Año) <span className="text-[#3B2219]">*</span></span>
+                  <span>Fecha de registro (Día, Mes, Año) <span className="text-red-500">*</span></span>
                 </label>
 
                 <div className="grid grid-cols-3 gap-2">
-                  {/* 1. DÍA con numeración de días del mes */}
+                  {/* 1. DÍA */}
                   <div>
                     <label className="text-[10px] font-semibold text-gray-500 block mb-0.5">
                       Día
@@ -207,15 +246,10 @@ export default function SubirDocumentoModal({
                       className="w-full px-2.5 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 outline-none focus:border-[#3B2219] cursor-pointer"
                     >
                       {Array.from({ length: diasEnMesActual }, (_, i) => i + 1).map((d) => {
-                        const estaOcupado = diasOcupados.has(d);
+                        const tieneDoc = docsEnMes.some((doc) => doc.dia === d);
                         return (
-                          <option
-                            key={d}
-                            value={d}
-                            disabled={estaOcupado}
-                            className={estaOcupado ? 'text-gray-300 bg-gray-100 font-normal' : ''}
-                          >
-                            {d}
+                          <option key={d} value={d}>
+                            {d} {tieneDoc ? '(Con folio)' : ''}
                           </option>
                         );
                       })}
@@ -260,7 +294,7 @@ export default function SubirDocumentoModal({
                       }}
                       className="w-full px-2.5 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 outline-none focus:border-[#3B2219] cursor-pointer"
                     >
-                      {[2024, 2025, 2026, 2027, 2028, 2029, 2030].map((y) => (
+                      {aniosDisponibles.map((y) => (
                         <option key={y} value={y}>
                           {y}
                         </option>
@@ -269,33 +303,48 @@ export default function SubirDocumentoModal({
                   </div>
                 </div>
 
-                {diasOcupados.has(dia) ? (
-                  <p className="text-[10px] text-red-600 font-semibold mt-1.5">
-                    El día {dia} ya tiene un folio registrado. Por favor selecciona otro día.
-                  </p>
-                ) : diasOcupados.size > 0 ? (
-                  <p className="text-[10px] text-gray-400 mt-1.5">
-                    Los días deshabilitados ya cuentan con un folio registrado.
-                  </p>
-                ) : null}
+                {/* ALERTA: Si la fecha está fuera del periodo del proyecto */}
+                {fueraDeDuracion && duracionProyecto && (
+                  <div className="mt-2.5 p-2.5 rounded-xl bg-amber-50 border border-amber-200 flex items-start gap-2 text-amber-900 text-xs">
+                    <Clock size={15} className="text-amber-600 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-bold">Fecha fuera del periodo del proyecto</p>
+                      <p className="text-[10.5px] text-amber-700 mt-0.5">
+                        El proyecto está establecido desde <strong>{MESES_NOMBRES[duracionProyecto.mesInicio - 1]} {duracionProyecto.anioInicio}</strong> hasta <strong>{MESES_NOMBRES[duracionProyecto.mesFin - 1]} {duracionProyecto.anioFin}</strong>.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* ALERTA: Si la fecha seleccionada ya cuenta con un folio registrado */}
+                {docExistenteEnDia && (
+                  <div className="mt-2.5 p-2.5 rounded-xl bg-blue-50 border border-blue-200 flex items-start gap-2 text-blue-900 text-xs">
+                    <Info size={15} className="text-blue-600 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-bold">Ya existe un folio en esta fecha</p>
+                      <p className="text-[10.5px] text-blue-700 mt-0.5">
+                        El <strong>Día {dia} de {MESES_NOMBRES[mes - 1]} {anio}</strong> ya tiene el folio: <em>"{docExistenteEnDia.titulo}"</em>. Al subir este nuevo archivo, <strong>se actualizará el registro existente</strong>.
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
 
-              {/* Título o Folio */}
+              {/* 2. TÍTULO DEL FOLIO */}
               <div>
                 <label className="text-[11px] font-bold text-gray-700 block mb-1">
-                  Título del Registro / Folio <span className="text-[#3B2219]">*</span>
+                  Título del Registro / Folio <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
                   placeholder="Ej. Folio 045 - Avance Terracería Estación 14+250"
                   value={titulo}
                   onChange={(e) => setTitulo(e.target.value)}
-                  required
-                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-800 placeholder-gray-400 outline-none focus:border-[#3B2219]"
+                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-800 placeholder-gray-400 outline-none focus:border-[#3B2219] focus:bg-white transition-colors"
                 />
               </div>
 
-              {/* Observaciones o Descripción */}
+              {/* 3. OBSERVACIONES TÉCNICAS */}
               <div>
                 <label className="text-[11px] font-bold text-gray-700 block mb-1">
                   Observaciones Técnicas (Opcional)
@@ -305,15 +354,16 @@ export default function SubirDocumentoModal({
                   placeholder="Notas de campo, compactación, ensayos o eventos relevantes..."
                   value={descripcion}
                   onChange={(e) => setDescripcion(e.target.value)}
-                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-800 placeholder-gray-400 outline-none focus:border-[#3B2219] resize-none"
+                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-800 placeholder-gray-400 outline-none focus:border-[#3B2219] focus:bg-white resize-none transition-colors"
                 />
               </div>
 
-              {/* Dropzone de Archivo PDF */}
+              {/* 4. DROPZONE DE ARCHIVO PDF */}
               <div>
                 <label className="text-[11px] font-bold text-gray-700 block mb-1">
-                  Documento PDF de Bitácora <span className="text-[#3B2219]">*</span>
+                  Documento PDF de Bitácora <span className="text-red-500">*</span>
                 </label>
+
                 <div
                   onDragOver={(e) => {
                     e.preventDefault();
@@ -322,12 +372,12 @@ export default function SubirDocumentoModal({
                   onDragLeave={() => setIsDragging(false)}
                   onDrop={handleDrop}
                   onClick={() => fileInputRef.current?.click()}
-                  className={`border-2 border-dashed rounded-xl p-5 text-center cursor-pointer transition-all ${
+                  className={`border-2 border-dashed rounded-2xl p-4 text-center cursor-pointer transition-all ${
                     isDragging
-                      ? 'border-[#3B2219] bg-[#F4ECE6]/50'
+                      ? 'border-[#3B2219] bg-[#F4ECE6]/40 scale-[1.01]'
                       : archivo
-                      ? 'border-emerald-300 bg-emerald-50/40'
-                      : 'border-gray-200 hover:border-[#3B2219] hover:bg-gray-50'
+                      ? 'border-emerald-300 bg-emerald-50/30'
+                      : 'border-gray-200 hover:border-[#3B2219] bg-gray-50/50 hover:bg-gray-50'
                   }`}
                 >
                   <input
@@ -391,10 +441,12 @@ export default function SubirDocumentoModal({
 
               <div className="text-center">
                 <h4 className="text-sm font-bold text-gray-900">
-                  ¿Confirmar publicación de bitácora?
+                  {docExistenteEnDia ? '¿Confirmar actualización de folio?' : '¿Confirmar publicación de bitácora?'}
                 </h4>
                 <p className="text-[11px] text-gray-500 mt-1">
-                  El documento se guardará de inmediato y estará disponible en el calendario de obra.
+                  {docExistenteEnDia
+                    ? `Se actualizará el folio existente para el Día ${dia} de ${MESES_NOMBRES[mes - 1]} ${anio}.`
+                    : 'El documento se guardará de inmediato y estará disponible en el calendario de obra.'}
                 </p>
               </div>
 
@@ -405,6 +457,12 @@ export default function SubirDocumentoModal({
                     Día {dia} de {MESES_NOMBRES[mes - 1]} de {anio}
                   </span>
                 </div>
+                {docExistenteEnDia && (
+                  <div className="flex justify-between text-blue-700">
+                    <span className="text-gray-500">Estado:</span>
+                    <span className="font-bold">Reemplazo / Actualización</span>
+                  </div>
+                )}
                 <div className="flex justify-between">
                   <span className="text-gray-500">Título / Folio:</span>
                   <span className="font-bold text-gray-800 truncate max-w-[200px]">
@@ -442,10 +500,10 @@ export default function SubirDocumentoModal({
               <button
                 type="submit"
                 form="drawer-subir-form"
-                disabled={!archivo || !titulo.trim() || diasOcupados.has(dia)}
+                disabled={!archivo || !titulo.trim()}
                 className="px-4 py-2 bg-[#3B2219] hover:bg-[#2A1710] text-white text-xs font-bold rounded-xl transition-colors shadow-2xs disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
               >
-                Continuar a confirmación
+                {docExistenteEnDia ? 'Continuar (Actualizar Folio)' : 'Continuar a confirmación'}
               </button>
             </>
           ) : (
@@ -456,21 +514,21 @@ export default function SubirDocumentoModal({
                 disabled={subiendo}
                 className="px-4 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-100 rounded-xl transition-colors cursor-pointer"
               >
-                Volver
+                Volver a editar
               </button>
               <button
                 type="button"
                 onClick={handleConfirmarSubida}
                 disabled={subiendo}
-                className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#3B2219] hover:bg-[#2A1710] text-white text-xs font-bold rounded-xl transition-colors shadow-2xs cursor-pointer"
+                className="inline-flex items-center gap-2 px-5 py-2 bg-[#3B2219] hover:bg-[#2A1710] text-white text-xs font-bold rounded-xl transition-colors shadow-sm cursor-pointer disabled:opacity-50"
               >
                 {subiendo ? (
                   <>
                     <Loader2 size={14} className="animate-spin" />
-                    <span>Subiendo documento...</span>
+                    <span>Subiendo a la nube...</span>
                   </>
                 ) : (
-                  <span>Confirmar y Subir</span>
+                  <span>{docExistenteEnDia ? 'Actualizar Folio Ahora' : 'Confirmar y Publicar'}</span>
                 )}
               </button>
             </>

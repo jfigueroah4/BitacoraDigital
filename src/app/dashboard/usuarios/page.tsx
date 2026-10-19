@@ -205,12 +205,17 @@ export default function UsuariosPage() {
       if (storedProfile) {
         const profile = JSON.parse(storedProfile);
         setCurrentUserEmail(profile.email || '');
-        setIsAdmin(profile.rol === 'Administrador');
+        const adminCheck = String(profile.rol || '').toLowerCase().includes('admin');
+        setIsAdmin(adminCheck);
+        if (!adminCheck) {
+          showErrorToast('No tienes permisos de Administrador para acceder al módulo de Usuarios');
+          router.push('/dashboard');
+        }
       }
     } catch (err) {
       console.error('Error cargando permisos del usuario:', err);
     }
-  }, []);
+  }, [router]);
 
   useEffect(() => {
     cargarUsuarios();
@@ -233,7 +238,12 @@ export default function UsuariosPage() {
         u.correo.toLowerCase().includes(q) ||
         (u.cargo && u.cargo.toLowerCase().includes(q));
 
-      const matchEstado = filtroEstado === 'Todos' || u.estado === filtroEstado;
+      const matchEstado =
+        filtroEstado === 'Todos' ||
+        u.estado === filtroEstado ||
+        (filtroEstado === 'Inactivo' && (u.estado === 'Inactivo' || (u as any).activo === false)) ||
+        (filtroEstado === 'Suspendido' && u.estado === 'Suspendido');
+
       const matchRol = filtroRol === 'Todos' || u.rol === filtroRol;
 
       return matchBusqueda && matchEstado && matchRol;
@@ -382,16 +392,24 @@ export default function UsuariosPage() {
       localStorage.setItem('bitacora_usuarios_lista', JSON.stringify(actualizados));
       showSuccessToast('Usuario eliminado definitivamente');
     } else {
-      const nuevoEstado: EstadoUsuario = accion === 'activar' ? 'Activo' : 'Suspendido';
+      const nuevoEstado: EstadoUsuario = accion === 'activar' ? 'Activo' : 'Inactivo';
       const actualizados = usuarios.map((u) => {
         if (u.id === usuarioEliminar.id) {
-          return { ...u, estado: nuevoEstado };
+          return {
+            ...u,
+            estado: nuevoEstado,
+            activo: accion === 'activar',
+          };
         }
         return u;
       });
       setUsuarios(actualizados);
       localStorage.setItem('bitacora_usuarios_lista', JSON.stringify(actualizados));
-      showSuccessToast(accion === 'activar' ? 'Usuario activado exitosamente' : 'Usuario suspendido exitosamente');
+      showSuccessToast(
+        accion === 'activar'
+          ? 'Usuario activado exitosamente'
+          : 'Usuario inactivado exitosamente'
+      );
     }
 
     setDeleteOpen(false);
@@ -399,7 +417,15 @@ export default function UsuariosPage() {
   };
 
   const handleCerrarSesionRemota = (usr: Usuario) => {
-    showSuccessToast(`Sesión remota cerrada para ${usr.nombre}`);
+    const actualizados = usuarios.map((u) => {
+      if (u.id === usr.id) {
+        return { ...u, estado: 'Inactivo' as EstadoUsuario, activo: true };
+      }
+      return u;
+    });
+    setUsuarios(actualizados);
+    localStorage.setItem('bitacora_usuarios_lista', JSON.stringify(actualizados));
+    showSuccessToast(`Sesión remota cerrada para ${usr.nombre}. Estado actualizado a Inactivo.`);
   };
 
   return (

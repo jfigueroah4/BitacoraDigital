@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import {
   Search,
   User,
@@ -104,10 +104,64 @@ export default function TopBar({
   onVolverInicio,
 }: TopBarProps) {
   const router = useRouter();
+  const pathname = usePathname();
   const searchContainerRef = useRef<HTMLDivElement>(null);
 
   const [profileOpen, setProfileOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(userProfile || null);
+
+  const isAdmin = useMemo(() => {
+    const rol = (currentUser?.rol || '').toLowerCase().trim();
+    return rol.includes('admin');
+  }, [currentUser]);
+
+  // Indicador dinámico de sección y título mostrado en TopBar
+  const { seccionActiva, tituloMostrado } = useMemo(() => {
+    if (bitacoraNombre.includes('•')) {
+      const partes = bitacoraNombre.split('•').map((s) => s.trim());
+      const seccion = partes.slice(1).join(' • ');
+      return {
+        seccionActiva: seccion.toUpperCase(),
+        tituloMostrado: bitacoraNombre,
+      };
+    }
+
+    if (pathname.includes('/dashboard/usuarios')) {
+      return {
+        seccionActiva: 'USUARIOS Y ROLES',
+        tituloMostrado: `${bitacoraNombre} • Usuarios`,
+      };
+    }
+    if (pathname.includes('/dashboard/roles')) {
+      return {
+        seccionActiva: 'ROLES Y PERMISOS',
+        tituloMostrado: `${bitacoraNombre} • Roles`,
+      };
+    }
+    if (pathname.includes('/dashboard/tickets')) {
+      return {
+        seccionActiva: 'TICKETS DE SOPORTE',
+        tituloMostrado: `${bitacoraNombre} • Tickets`,
+      };
+    }
+    if (pathname.includes('/dashboard/soporte')) {
+      return {
+        seccionActiva: 'SOPORTE TÉCNICO',
+        tituloMostrado: `${bitacoraNombre} • Soporte`,
+      };
+    }
+    if (pathname.includes('/dashboard/perfil')) {
+      return {
+        seccionActiva: 'MI PERFIL',
+        tituloMostrado: `${bitacoraNombre} • Mi Perfil`,
+      };
+    }
+
+    return {
+      seccionActiva: 'BITÁCORA GENERAL',
+      tituloMostrado: bitacoraNombre,
+    };
+  }, [pathname, bitacoraNombre]);
 
   // Search state similar to DomunNet
   const [internalQuery, setInternalQuery] = useState(searchQuery);
@@ -180,31 +234,33 @@ export default function TopBar({
         } catch (_) {}
       }
 
-      // 3. Usuarios registrados
-      const storedUsers = localStorage.getItem('bitacora_usuarios_lista');
-      if (storedUsers) {
-        try {
-          const parsedU = JSON.parse(storedUsers);
-          if (Array.isArray(parsedU)) {
-            parsedU.forEach((u: any, i: number) => {
-              if (u && (u.nombre || u.correo)) {
-                items.push({
-                  id: `usr-${u.id || i}`,
-                  name: `Usuario: ${u.nombre || u.correo} (${u.rol || 'Usuario'})`,
-                  path: `/dashboard/usuarios`,
-                  category: 'Usuarios',
-                  detail: u.correo || u.cargo || '',
-                  keywords: [
-                    u.nombre?.toLowerCase() || '',
-                    u.correo?.toLowerCase() || '',
-                    u.rol?.toLowerCase() || '',
-                    u.cargo?.toLowerCase() || '',
-                  ],
-                });
-              }
-            });
-          }
-        } catch (_) {}
+      // 3. Usuarios registrados (solo accesible para Administradores)
+      if (isAdmin) {
+        const storedUsers = localStorage.getItem('bitacora_usuarios_lista');
+        if (storedUsers) {
+          try {
+            const parsedU = JSON.parse(storedUsers);
+            if (Array.isArray(parsedU)) {
+              parsedU.forEach((u: any, i: number) => {
+                if (u && (u.nombre || u.correo)) {
+                  items.push({
+                    id: `usr-${u.id || i}`,
+                    name: `Usuario: ${u.nombre || u.correo} (${u.rol || 'Usuario'})`,
+                    path: `/dashboard/usuarios`,
+                    category: 'Usuarios',
+                    detail: u.correo || u.cargo || '',
+                    keywords: [
+                      u.nombre?.toLowerCase() || '',
+                      u.correo?.toLowerCase() || '',
+                      u.rol?.toLowerCase() || '',
+                      u.cargo?.toLowerCase() || '',
+                    ],
+                  });
+                }
+              });
+            }
+          } catch (_) {}
+        }
       }
 
       setDynamicItems(items);
@@ -260,12 +316,25 @@ export default function TopBar({
     return (clean[0] || 'U').toUpperCase();
   };
 
-  // Filtrado de sugerencias estilo DomunNet
+  // Filtrado de sugerencias estilo DomunNet con límites estrictos entre Administrador y Usuario normal
   const suggestions = useMemo(() => {
     const q = internalQuery.trim().toLowerCase();
     if (!q) return [];
 
-    const allItems = [...systemRoutes, ...dynamicItems];
+    let availableRoutes = systemRoutes;
+    let availableDynamic = dynamicItems;
+
+    // Si NO es administrador, ocultar páginas y módulos administrativos, y catálogo de usuarios
+    if (!isAdmin) {
+      availableRoutes = systemRoutes.filter(
+        (item) => item.category !== 'Administración' && !item.path.includes('/usuarios') && !item.path.includes('/roles')
+      );
+      availableDynamic = dynamicItems.filter(
+        (item) => item.category !== 'Usuarios'
+      );
+    }
+
+    const allItems = [...availableRoutes, ...availableDynamic];
     return allItems.filter((item) => {
       const matchName = item.name.toLowerCase().includes(q);
       const matchCategory = item.category.toLowerCase().includes(q);
@@ -273,7 +342,7 @@ export default function TopBar({
       const matchKeywords = item.keywords.some((k) => k.toLowerCase().includes(q));
       return matchName || matchCategory || matchDetail || matchKeywords;
     });
-  }, [internalQuery, dynamicItems]);
+  }, [internalQuery, dynamicItems, isAdmin]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
@@ -331,11 +400,13 @@ export default function TopBar({
           />
         </div>
         <div className="flex flex-col leading-tight select-none">
-          <span className="text-[8px] font-normal text-gray-400 uppercase tracking-widest hidden sm:block">
-            Módulo de Bitácora Electrónica
-          </span>
-          <span className="text-[11px] sm:text-[12px] text-gray-700 font-medium tracking-tight truncate max-w-[170px] sm:max-w-none group-hover:text-[#3B2219] transition-colors">
-            {bitacoraNombre}
+          <div className="flex items-center gap-1.5 text-[8px] font-semibold uppercase tracking-wider hidden sm:flex">
+            <span className="text-gray-400">Módulo de Bitácora Electrónica</span>
+            <span className="text-gray-300">•</span>
+            <span className="text-[#3B2219] font-bold tracking-normal">{seccionActiva}</span>
+          </div>
+          <span className="text-[11px] sm:text-[12px] text-gray-800 font-semibold tracking-tight truncate max-w-[200px] sm:max-w-none group-hover:text-[#3B2219] transition-colors">
+            {tituloMostrado}
           </span>
         </div>
       </div>
@@ -346,7 +417,11 @@ export default function TopBar({
           <Search size={13} className="text-gray-400 shrink-0" />
           <input
             type="text"
-            placeholder="Buscar folios, meses, fechas, páginas..."
+            placeholder={
+              isAdmin
+                ? "Buscar folios, meses, usuarios, páginas..."
+                : "Buscar folios, meses, fechas, páginas..."
+            }
             value={internalQuery}
             onFocus={handleInputFocus}
             onChange={handleInputChange}
@@ -454,14 +529,17 @@ export default function TopBar({
                   <span>Mi perfil</span>
                 </Link>
 
-                <Link
-                  href="/dashboard/usuarios"
-                  onClick={() => setProfileOpen(false)}
-                  className="flex items-center gap-2.5 px-4 py-2 hover:bg-gray-50 transition-colors text-[11px] text-gray-700 font-medium"
-                >
-                  <Users size={13} className="text-gray-400 shrink-0" />
-                  <span>Usuarios y Roles</span>
-                </Link>
+                {/* Usuarios y Roles - Solo Administradores */}
+                {isAdmin && (
+                  <Link
+                    href="/dashboard/usuarios"
+                    onClick={() => setProfileOpen(false)}
+                    className="flex items-center gap-2.5 px-4 py-2 hover:bg-gray-50 transition-colors text-[11px] text-gray-700 font-medium"
+                  >
+                    <Users size={13} className="text-gray-400 shrink-0" />
+                    <span>Usuarios y Roles</span>
+                  </Link>
+                )}
 
                 <Link
                   href="/dashboard/tickets"

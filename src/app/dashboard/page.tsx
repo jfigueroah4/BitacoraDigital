@@ -259,7 +259,11 @@ export default function DashboardPage() {
     <div className="min-h-screen bg-[#F3F4F7] text-[#07152B] flex flex-col font-poppins selection:bg-[#3B2219] selection:text-white">
       {/* TopBar with brand, search bar, clickable book logo to return home */}
       <TopBar
-        bitacoraNombre="Proyecto: Conexion VAS - Hincapie"
+        bitacoraNombre={
+          mesActivoObj
+            ? `Proyecto: Conexion VAS - Hincapie • ${mesActivoObj.nombre} ${mesActivoObj.anio}`
+            : 'Proyecto: Conexion VAS - Hincapie'
+        }
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         userProfile={userProfile}
@@ -358,6 +362,7 @@ export default function DashboardPage() {
         usuarioNombre={userProfile?.nombre || 'Administrador'}
         onDocumentoSubido={handleDocumentoSubido}
         documentosExistentes={documentos}
+        duracionProyecto={duracionProyecto}
       />
 
       {/* DRAWER LATERAL DE CARGA MÚLTIPLE DE ARCHIVOS Y FECHAS */}
@@ -368,6 +373,8 @@ export default function DashboardPage() {
         anioActual={mesActivoObj?.anio || (typeof anioActual === 'number' ? anioActual : new Date().getFullYear())}
         usuarioNombre={userProfile?.nombre || 'Administrador'}
         onDocumentosSubidos={handleDocumentosMultiplesSubidos}
+        mesBloqueado={mesSeleccionadoNum !== null}
+        documentosExistentes={documentos}
       />
     </div>
   );

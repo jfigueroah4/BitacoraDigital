@@ -175,6 +175,19 @@ export default function RolesPage() {
 
   useEffect(() => {
     try {
+      const storedProfile = localStorage.getItem('bitacora_user_profile');
+      if (storedProfile) {
+        const profile = JSON.parse(storedProfile);
+        const adminCheck = String(profile.rol || '').toLowerCase().includes('admin');
+        if (!adminCheck) {
+          showErrorToast('No tienes permisos de Administrador para gestionar roles');
+          router.push('/dashboard');
+          return;
+        }
+      }
+    } catch (_) {}
+
+    try {
       const storedRoles = localStorage.getItem('bitacora_roles_v2');
       if (storedRoles) {
         const parsed = JSON.parse(storedRoles);

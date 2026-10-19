@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   X,
   Files,
@@ -12,7 +12,10 @@ import {
   CheckCircle2,
   AlertTriangle,
   Loader2,
-  ArrowRight,
+  ChevronLeft,
+  ChevronRight,
+  Lock,
+  Info,
 } from 'lucide-react';
 import { DocumentoBitacora } from '@/types/bitacora';
 import { MESES_NOMBRES, getDiasEnMes } from '@/lib/mockData';
@@ -36,9 +39,12 @@ interface CargaMultipleDrawerProps {
   anioActual: number;
   usuarioNombre: string;
   onDocumentosSubidos: (docs: DocumentoBitacora[]) => void;
+  mesBloqueado?: boolean;
+  documentosExistentes?: DocumentoBitacora[];
 }
 
 const CANTIDADES_RAPIDAS = [2, 3, 5, 8, 10];
+const ITEMS_POR_PAGINA = 2; // Paginación después del 2do documento
 
 export default function CargaMultipleDrawer({
   isOpen,
@@ -47,10 +53,14 @@ export default function CargaMultipleDrawer({
   anioActual,
   usuarioNombre,
   onDocumentosSubidos,
+  mesBloqueado = false,
+  documentosExistentes = [],
 }: CargaMultipleDrawerProps) {
   const [items, setItems] = useState<ItemCargaMultiple[]>([]);
   const [subiendo, setSubiendo] = useState(false);
   const [progresoActual, setProgresoActual] = useState({ actual: 0, total: 0 });
+  const [paginaActual, setPaginaActual] = useState(1);
+  const [cantidadPersonalizada, setCantidadPersonalizada] = useState('3');
 
   // Inicializar items al abrir el drawer
   useEffect(() => {
@@ -60,7 +70,7 @@ export default function CargaMultipleDrawer({
       const mesInicial = mesActual || (hoy.getMonth() + 1);
       const anioInicial = anioActual || hoy.getFullYear();
 
-      // Crear 3 items iniciales con fechas consecutivas a partir de hoy o el inicio de mes
+      // Iniciar con 3 items con fechas consecutivas
       const itemsIniciales: ItemCargaMultiple[] = Array.from({ length: 3 }, (_, i) => {
         const diaCalculado = Math.min(
           getDiasEnMes(mesInicial, anioInicial),
@@ -78,6 +88,8 @@ export default function CargaMultipleDrawer({
       });
 
       setItems(itemsIniciales);
+      setPaginaActual(1);
+      setCantidadPersonalizada('3');
       setSubiendo(false);
       setProgresoActual({ actual: 0, total: 0 });
     }
@@ -94,19 +106,29 @@ export default function CargaMultipleDrawer({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, subiendo, onClose]);
 
+  // Total de páginas calculadas
+  const totalPaginas = Math.ceil(items.length / ITEMS_POR_PAGINA) || 1;
+
+  // Asegurar que la página actual no sobrepase el total
+  useEffect(() => {
+    if (paginaActual > totalPaginas) {
+      setPaginaActual(totalPaginas);
+    }
+  }, [totalPaginas, paginaActual]);
+
   if (!isOpen) return null;
 
-  // Cambiar la cantidad total de archivos a subir
+  // Ajustar la cantidad total de archivos a subir
   const handleAjustarCantidad = (nuevaCantidad: number) => {
-    if (nuevaCantidad < 1) return;
+    if (isNaN(nuevaCantidad) || nuevaCantidad < 1) return;
     const diff = nuevaCantidad - items.length;
 
     if (diff > 0) {
       const hoy = new Date();
       const nuevos: ItemCargaMultiple[] = Array.from({ length: diff }, (_, i) => {
         const ultimoItem = items[items.length - 1];
-        const mesRef = ultimoItem ? ultimoItem.mes : mesActual || (hoy.getMonth() + 1);
-        const anioRef = ultimoItem ? ultimoItem.anio : anioActual || hoy.getFullYear();
+        const mesRef = mesBloqueado ? mesActual : ultimoItem ? ultimoItem.mes : mesActual || (hoy.getMonth() + 1);
+        const anioRef = mesBloqueado ? anioActual : ultimoItem ? ultimoItem.anio : anioActual || hoy.getFullYear();
         const maxDias = getDiasEnMes(mesRef, anioRef);
         const diaSiguiente = ultimoItem ? Math.min(maxDias, ultimoItem.dia + 1) : hoy.getDate();
 
@@ -124,17 +146,18 @@ export default function CargaMultipleDrawer({
     } else if (diff < 0) {
       setItems(items.slice(0, nuevaCantidad));
     }
+    setCantidadPersonalizada(String(nuevaCantidad));
   };
 
   const handleAgregarItem = () => {
     const hoy = new Date();
     const ultimoItem = items[items.length - 1];
-    const mesRef = ultimoItem ? ultimoItem.mes : mesActual || (hoy.getMonth() + 1);
-    const anioRef = ultimoItem ? ultimoItem.anio : anioActual || hoy.getFullYear();
+    const mesRef = mesBloqueado ? mesActual : ultimoItem ? ultimoItem.mes : mesActual || (hoy.getMonth() + 1);
+    const anioRef = mesBloqueado ? anioActual : ultimoItem ? ultimoItem.anio : anioActual || hoy.getFullYear();
     const maxDias = getDiasEnMes(mesRef, anioRef);
     const diaSiguiente = ultimoItem ? Math.min(maxDias, ultimoItem.dia + 1) : hoy.getDate();
 
-    setItems([
+    const nuevos = [
       ...items,
       {
         id: `item-${Date.now()}-${items.length}`,
@@ -145,7 +168,12 @@ export default function CargaMultipleDrawer({
         descripcion: '',
         archivo: null,
       },
-    ]);
+    ];
+    setItems(nuevos);
+    setCantidadPersonalizada(String(nuevos.length));
+    // Navegar a la página donde quedó el nuevo documento
+    const nuevaPagina = Math.ceil(nuevos.length / ITEMS_POR_PAGINA);
+    setPaginaActual(nuevaPagina);
   };
 
   const handleEliminarItem = (id: string) => {
@@ -153,7 +181,23 @@ export default function CargaMultipleDrawer({
       showErrorToast('Debes mantener al menos un documento en la lista.');
       return;
     }
-    setItems(items.filter((item) => item.id !== id));
+    const filtrados = items.filter((item) => item.id !== id);
+    setItems(filtrados);
+    setCantidadPersonalizada(String(filtrados.length));
+  };
+
+  const handleQuitarArchivo = (id: string) => {
+    setItems(
+      items.map((it) => {
+        if (it.id === id) {
+          return {
+            ...it,
+            archivo: null,
+          };
+        }
+        return it;
+      })
+    );
   };
 
   const handleActualizarItem = (id: string, campo: keyof ItemCargaMultiple, valor: any) => {
@@ -161,7 +205,6 @@ export default function CargaMultipleDrawer({
       items.map((it) => {
         if (it.id === id) {
           const updated = { ...it, [campo]: valor };
-          // Si cambia mes o año, validar que el día no exceda el máximo del mes
           if (campo === 'mes' || campo === 'anio') {
             const maxDias = getDiasEnMes(
               campo === 'mes' ? valor : it.mes,
@@ -201,6 +244,7 @@ export default function CargaMultipleDrawer({
 
   const itemsConArchivo = items.filter((it) => it.archivo !== null);
 
+  // Subir todos los documentos conservando solo el primero si coinciden en el día
   const handleSubirTodos = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -217,15 +261,30 @@ export default function CargaMultipleDrawer({
       }
     }
 
+    // Filtrar duplicados por fecha: SE MANTIENE SOLO EL PRIMERO QUE SE SUBIÓ EN ESE DÍA
+    const diasVistos = new Map<string, ItemCargaMultiple>();
+    const itemsADepositar: ItemCargaMultiple[] = [];
+    let duplicadosDescartados = 0;
+
+    itemsConArchivo.forEach((item) => {
+      const claveFecha = `${item.anio}-${item.mes}-${item.dia}`;
+      if (!diasVistos.has(claveFecha)) {
+        diasVistos.set(claveFecha, item);
+        itemsADepositar.push(item);
+      } else {
+        duplicadosDescartados++;
+      }
+    });
+
     setSubiendo(true);
-    setProgresoActual({ actual: 0, total: itemsConArchivo.length });
+    setProgresoActual({ actual: 0, total: itemsADepositar.length });
 
     const nuevosDocsSubidos: DocumentoBitacora[] = [];
 
     try {
-      for (let i = 0; i < itemsConArchivo.length; i++) {
-        const item = itemsConArchivo[i];
-        setProgresoActual({ actual: i + 1, total: itemsConArchivo.length });
+      for (let i = 0; i < itemsADepositar.length; i++) {
+        const item = itemsADepositar[i];
+        setProgresoActual({ actual: i + 1, total: itemsADepositar.length });
 
         if (item.archivo) {
           const docSubido = await subirDocumentoBitacora({
@@ -244,9 +303,11 @@ export default function CargaMultipleDrawer({
       }
 
       onDocumentosSubidos(nuevosDocsSubidos);
-      showSuccessToast(
-        `¡Se subieron exitosamente ${nuevosDocsSubidos.length} documentos de bitácora en sus fechas correspondientes!`
-      );
+      let mensajeExito = `¡Se subieron exitosamente ${nuevosDocsSubidos.length} folios en sus fechas correspondientes!`;
+      if (duplicadosDescartados > 0) {
+        mensajeExito += ` (Se detectaron ${duplicadosDescartados} archivos con días coincidentes; se conservó únicamente el primero de cada fecha).`;
+      }
+      showSuccessToast(mensajeExito);
       onClose();
     } catch (err: any) {
       console.error(err);
@@ -255,6 +316,10 @@ export default function CargaMultipleDrawer({
       setSubiendo(false);
     }
   };
+
+  // Slice paginado: 2 documentos por página para mantener interfaz limpia
+  const inicioIndex = (paginaActual - 1) * ITEMS_POR_PAGINA;
+  const itemsPaginados = items.slice(inicioIndex, inicioIndex + ITEMS_POR_PAGINA);
 
   return (
     <>
@@ -302,11 +367,11 @@ export default function CargaMultipleDrawer({
                 ¿Cuántos archivos quieres subir?
               </span>
               <span className="text-[9.5px] text-gray-400">
-                Selecciona la cantidad o agrégalos individualmente
+                Selecciona rápido o escribe una cantidad personalizada
               </span>
             </div>
 
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1.5 flex-wrap">
               {CANTIDADES_RAPIDAS.map((num) => (
                 <button
                   key={num}
@@ -322,10 +387,30 @@ export default function CargaMultipleDrawer({
                 </button>
               ))}
 
+              {/* Selector personalizado */}
+              <div className="flex items-center gap-1 bg-gray-50 border border-gray-200 rounded-lg px-1.5 py-0.5">
+                <span className="text-[10px] text-gray-500 font-medium">Cant:</span>
+                <input
+                  type="number"
+                  min="1"
+                  max="31"
+                  value={cantidadPersonalizada}
+                  onChange={(e) => {
+                    setCantidadPersonalizada(e.target.value);
+                    const parsed = parseInt(e.target.value, 10);
+                    if (!isNaN(parsed) && parsed >= 1 && parsed <= 31) {
+                      handleAjustarCantidad(parsed);
+                    }
+                  }}
+                  className="w-10 text-center font-bold text-xs bg-white border border-gray-200 rounded py-0.5 outline-none focus:border-[#3B2219]"
+                />
+              </div>
+
+              {/* Botón rápido +1 */}
               <button
                 type="button"
                 onClick={handleAgregarItem}
-                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#F4ECE6] text-[#3B2219] hover:bg-[#E8DCD4] text-xs font-bold transition-colors cursor-pointer ml-1"
+                className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-[#F4ECE6] text-[#3B2219] hover:bg-[#E8DCD4] text-xs font-bold transition-colors cursor-pointer"
                 title="Agregar un archivo más a la lista"
               >
                 <Plus size={13} strokeWidth={2.5} />
@@ -335,7 +420,17 @@ export default function CargaMultipleDrawer({
           </div>
         </div>
 
-        {/* Content del Drawer: Lista de archivos con sus fechas individuales */}
+        {/* Indicador de mes bloqueado si aplica */}
+        {mesBloqueado && (
+          <div className="px-5 py-2 bg-amber-50/70 border-b border-amber-100/80 flex items-center gap-2 text-amber-900 text-[11px]">
+            <Lock size={12} className="text-amber-700 shrink-0" />
+            <span>
+              Ingreso exclusivo para <strong>{MESES_NOMBRES[(mesActual || 1) - 1]} {anioActual}</strong>. Solo puedes seleccionar el día correspondiente.
+            </span>
+          </div>
+        )}
+
+        {/* Contenido con Scroll: Cards paginadas de a 2 */}
         <div className="flex-1 overflow-y-auto p-5 space-y-4">
           {subiendo && (
             <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 flex items-center gap-3 text-amber-900 text-xs animate-fadeIn">
@@ -349,9 +444,22 @@ export default function CargaMultipleDrawer({
             </div>
           )}
 
+          {/* Cards de documentos (mostrando 2 por página) */}
           <div className="space-y-4">
-            {items.map((item, index) => {
+            {itemsPaginados.map((item) => {
+              const globalIndex = items.findIndex((it) => it.id === item.id);
               const diasEnMes = getDiasEnMes(item.mes, item.anio);
+
+              // 1. Detección de duplicado en el mismo lote
+              const primerIndiceMismaFecha = items.findIndex(
+                (it) => it.dia === item.dia && it.mes === item.mes && it.anio === item.anio
+              );
+              const esDuplicadoEnLote = primerIndiceMismaFecha !== -1 && primerIndiceMismaFecha < globalIndex;
+
+              // 2. Detección de folio preexistente en la base de datos
+              const yaExisteEnBitacora = documentosExistentes.some(
+                (d) => d.dia === item.dia && d.mes === item.mes && d.anio === item.anio
+              );
 
               return (
                 <div
@@ -366,10 +474,10 @@ export default function CargaMultipleDrawer({
                   <div className="flex items-center justify-between pb-2 border-b border-gray-100">
                     <div className="flex items-center gap-2">
                       <span className="w-5 h-5 rounded-full bg-[#3B2219] text-white text-[10px] font-bold flex items-center justify-center">
-                        {index + 1}
+                        {globalIndex + 1}
                       </span>
                       <span className="text-xs font-bold text-gray-800">
-                        Documento #{index + 1}
+                        Documento #{globalIndex + 1}
                       </span>
                       {item.archivo && (
                         <span className="inline-flex items-center gap-1 text-[9.5px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
@@ -390,15 +498,41 @@ export default function CargaMultipleDrawer({
                     )}
                   </div>
 
+                  {/* Alertas de Coincidencia de Fecha */}
+                  {esDuplicadoEnLote && (
+                    <div className="p-2 rounded-lg bg-amber-50 border border-amber-200/80 flex items-start gap-1.5 text-[10.5px] text-amber-800">
+                      <AlertTriangle size={13} className="text-amber-600 shrink-0 mt-0.5" />
+                      <span>
+                        <strong>Día duplicado:</strong> El Día {item.dia} ya está en el <strong>Documento #{primerIndiceMismaFecha + 1}</strong>. Solo se mantendrá el primer documento de esta fecha.
+                      </span>
+                    </div>
+                  )}
+
+                  {!esDuplicadoEnLote && yaExisteEnBitacora && (
+                    <div className="p-2 rounded-lg bg-blue-50 border border-blue-200/80 flex items-start gap-1.5 text-[10.5px] text-blue-800">
+                      <Info size={13} className="text-blue-600 shrink-0 mt-0.5" />
+                      <span>
+                        El <strong>Día {item.dia}</strong> ya tiene un folio registrado en la bitácora. Al subirlo se actualizará este folio.
+                      </span>
+                    </div>
+                  )}
+
                   {/* Selector de Fecha en orden: DÍA, MES, AÑO */}
                   <div>
-                    <label className="text-[10px] font-bold text-gray-600 flex items-center gap-1 mb-1">
-                      <Calendar size={12} className="text-[#3B2219]" />
-                      <span>Fecha asignada para este archivo:</span>
-                    </label>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-[10px] font-bold text-gray-600 flex items-center gap-1">
+                        <Calendar size={12} className="text-[#3B2219]" />
+                        <span>Fecha asignada para este archivo:</span>
+                      </label>
+                      {mesBloqueado && (
+                        <span className="text-[9px] text-gray-400 flex items-center gap-0.5">
+                          <Lock size={10} /> Mes bloqueado
+                        </span>
+                      )}
+                    </div>
 
                     <div className="grid grid-cols-3 gap-2">
-                      {/* Día */}
+                      {/* Día: Siempre editable */}
                       <div>
                         <select
                           value={item.dia}
@@ -415,14 +549,19 @@ export default function CargaMultipleDrawer({
                         </select>
                       </div>
 
-                      {/* Mes */}
+                      {/* Mes: Bloqueado si se abrió desde un mes específico */}
                       <div>
                         <select
                           value={item.mes}
+                          disabled={mesBloqueado}
                           onChange={(e) =>
                             handleActualizarItem(item.id, 'mes', Number(e.target.value))
                           }
-                          className="w-full px-2.5 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-semibold text-gray-800 outline-none focus:border-[#3B2219] cursor-pointer"
+                          className={`w-full px-2.5 py-1.5 border rounded-lg text-xs font-semibold outline-none ${
+                            mesBloqueado
+                              ? 'bg-gray-100 text-gray-500 border-gray-200 cursor-not-allowed opacity-80'
+                              : 'bg-white text-gray-800 border-gray-200 focus:border-[#3B2219] cursor-pointer'
+                          }`}
                         >
                           {MESES_NOMBRES.map((nombre, idx) => (
                             <option key={idx} value={idx + 1}>
@@ -432,14 +571,19 @@ export default function CargaMultipleDrawer({
                         </select>
                       </div>
 
-                      {/* Año */}
+                      {/* Año: Bloqueado si se abrió desde un mes específico */}
                       <div>
                         <select
                           value={item.anio}
+                          disabled={mesBloqueado}
                           onChange={(e) =>
                             handleActualizarItem(item.id, 'anio', Number(e.target.value))
                           }
-                          className="w-full px-2.5 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-semibold text-gray-800 outline-none focus:border-[#3B2219] cursor-pointer"
+                          className={`w-full px-2.5 py-1.5 border rounded-lg text-xs font-semibold outline-none ${
+                            mesBloqueado
+                              ? 'bg-gray-100 text-gray-500 border-gray-200 cursor-not-allowed opacity-80'
+                              : 'bg-white text-gray-800 border-gray-200 focus:border-[#3B2219] cursor-pointer'
+                          }`}
                         >
                           {[2024, 2025, 2026, 2027, 2028, 2029, 2030].map((y) => (
                             <option key={y} value={y}>
@@ -465,20 +609,20 @@ export default function CargaMultipleDrawer({
                     />
                   </div>
 
-                  {/* Selector / Dropzone de PDF individual */}
+                  {/* Selector / Dropzone de PDF individual con opción de ELIMINAR EL DOCUMENTO */}
                   <div>
                     <label className="text-[10px] font-bold text-gray-600 block mb-1">
                       Documento PDF <span className="text-red-500">*</span>:
                     </label>
 
                     {item.archivo ? (
-                      <div className="flex items-center justify-between p-2.5 bg-white border border-emerald-200 rounded-xl">
+                      <div className="flex items-center justify-between p-2.5 bg-white border border-emerald-200 rounded-xl gap-2">
                         <div className="flex items-center gap-2 min-w-0">
                           <div className="w-7 h-7 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
                             <FileText size={15} />
                           </div>
                           <div className="min-w-0">
-                            <p className="text-xs font-bold text-gray-800 truncate max-w-[240px]">
+                            <p className="text-xs font-bold text-gray-800 truncate max-w-[200px]">
                               {item.archivo.name}
                             </p>
                             <span className="text-[9.5px] text-gray-400">
@@ -487,19 +631,31 @@ export default function CargaMultipleDrawer({
                           </div>
                         </div>
 
-                        <label className="text-[10.5px] font-bold text-[#3B2219] hover:underline cursor-pointer px-2 py-1">
-                          Cambiar
-                          <input
-                            type="file"
-                            accept="application/pdf,.pdf"
-                            className="hidden"
-                            onChange={(e) => {
-                              if (e.target.files && e.target.files[0]) {
-                                handleFileSelect(item.id, e.target.files[0]);
-                              }
-                            }}
-                          />
-                        </label>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <label className="text-[10.5px] font-bold text-[#3B2219] hover:underline cursor-pointer px-2 py-1">
+                            Cambiar
+                            <input
+                              type="file"
+                              accept="application/pdf,.pdf"
+                              className="hidden"
+                              onChange={(e) => {
+                                if (e.target.files && e.target.files[0]) {
+                                  handleFileSelect(item.id, e.target.files[0]);
+                                }
+                              }}
+                            />
+                          </label>
+
+                          {/* Botón para eliminar el documento agregado */}
+                          <button
+                            type="button"
+                            onClick={() => handleQuitarArchivo(item.id)}
+                            className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                            title="Quitar este documento PDF"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
                       </div>
                     ) : (
                       <label className="border border-dashed border-gray-300 hover:border-[#3B2219] rounded-xl p-3 flex items-center justify-center gap-2 bg-white hover:bg-gray-50 transition-colors cursor-pointer text-gray-600 text-xs font-medium">
@@ -534,8 +690,66 @@ export default function CargaMultipleDrawer({
           </button>
         </div>
 
+        {/* Barra de Paginación (Paginación después del 2do documento) */}
+        {totalPaginas > 1 && (
+          <div className="px-5 py-2.5 bg-gray-50 border-t border-gray-200 flex items-center justify-between shrink-0">
+            <div className="text-[11px] text-gray-600">
+              Página <strong className="text-gray-900">{paginaActual}</strong> de <strong className="text-gray-900">{totalPaginas}</strong>{' '}
+              <span className="text-gray-400">
+                (Docs. {inicioIndex + 1} - {Math.min(items.length, inicioIndex + ITEMS_POR_PAGINA)} de {items.length})
+              </span>
+            </div>
+
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                disabled={paginaActual === 1}
+                onClick={() => setPaginaActual((prev) => Math.max(1, prev - 1))}
+                className="p-1 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                title="Página anterior"
+              >
+                <ChevronLeft size={14} />
+              </button>
+
+              {Array.from({ length: totalPaginas }, (_, i) => i + 1).map((num) => {
+                const item1 = items[(num - 1) * ITEMS_POR_PAGINA];
+                const item2 = items[(num - 1) * ITEMS_POR_PAGINA + 1];
+                const tieneArchivos = Boolean(item1?.archivo || item2?.archivo);
+
+                return (
+                  <button
+                    key={num}
+                    type="button"
+                    onClick={() => setPaginaActual(num)}
+                    className={`relative w-7 h-7 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      paginaActual === num
+                        ? 'bg-[#3B2219] text-white shadow-2xs'
+                        : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-100'
+                    }`}
+                  >
+                    {num}
+                    {tieneArchivos && paginaActual !== num && (
+                      <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                    )}
+                  </button>
+                );
+              })}
+
+              <button
+                type="button"
+                disabled={paginaActual === totalPaginas}
+                onClick={() => setPaginaActual((prev) => Math.min(totalPaginas, prev + 1))}
+                className="p-1 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                title="Página siguiente"
+              >
+                <ChevronRight size={14} />
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Footer del Drawer */}
-        <div className="p-4 border-t border-gray-100 bg-gray-50/80 flex items-center justify-between gap-3 shrink-0">
+        <div className="p-4 border-t border-gray-100 bg-white flex items-center justify-between gap-3 shrink-0">
           <div className="text-xs text-gray-600">
             <span className="font-bold text-[#3B2219]">{itemsConArchivo.length}</span> de{' '}
             <span className="font-bold">{items.length}</span> archivos listos
@@ -555,12 +769,12 @@ export default function CargaMultipleDrawer({
               type="button"
               onClick={handleSubirTodos}
               disabled={subiendo || itemsConArchivo.length === 0}
-              className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#3B2219] hover:bg-[#2A1710] text-white text-xs font-bold rounded-xl transition-colors shadow-2xs cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+              className="inline-flex items-center gap-2 px-5 py-2 bg-[#3B2219] hover:bg-[#2C1913] text-white text-xs font-bold rounded-xl transition-all shadow-sm active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
             >
               {subiendo ? (
                 <>
                   <Loader2 size={14} className="animate-spin" />
-                  <span>Subiendo ({progresoActual.actual}/{progresoActual.total})...</span>
+                  <span>Subiendo {progresoActual.actual}/{progresoActual.total}...</span>
                 </>
               ) : (
                 <>

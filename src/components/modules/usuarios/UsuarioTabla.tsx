@@ -85,7 +85,7 @@ export const UsuarioTabla = React.memo(function UsuarioTabla({
             (usuario.primer_apellido?.[0] || '')
           ).toUpperCase();
           const isSelf = currentUserEmail && usuario.correo?.toLowerCase() === currentUserEmail.toLowerCase();
-          const esSuspendido = usuario.estado === 'Suspendido' || (usuario as any).activo === false;
+          const esSuspendido = usuario.estado === 'Suspendido' || usuario.estado === 'Inactivo' || (usuario as any).activo === false;
 
           return (
             <div
@@ -238,7 +238,7 @@ export const UsuarioTabla = React.memo(function UsuarioTabla({
                   (usuario.primer_apellido?.[0] || '')
                 ).toUpperCase();
                 const isSelf = currentUserEmail && usuario.correo?.toLowerCase() === currentUserEmail.toLowerCase();
-                const esSuspendido = usuario.estado === 'Suspendido' || (usuario as any).activo === false;
+                const esSuspendido = usuario.estado === 'Suspendido' || usuario.estado === 'Inactivo' || (usuario as any).activo === false;
 
                 return (
                   <tr key={usuario.id} className="hover:bg-gray-50/70 transition-colors">
