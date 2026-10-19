@@ -306,6 +306,9 @@ export default function LoginPage() {
       document.cookie = `token=${sessionToken}; path=/; max-age=28800; SameSite=Lax`;
       localStorage.setItem('bitacora_user_profile', JSON.stringify(authUser));
       localStorage.setItem('bitacora_session_expiry', String(expSeconds * 1000));
+      if (process.env.NEXT_PUBLIC_BUILD_TIME) {
+        localStorage.setItem('bitacora_build_id', process.env.NEXT_PUBLIC_BUILD_TIME);
+      }
 
       // Gestión de recordar cuentas
       if (rememberMe) {

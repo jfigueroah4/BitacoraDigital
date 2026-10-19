@@ -39,27 +39,19 @@ export function middleware(request: NextRequest) {
     pathname.endsWith('.webp');
 
   if (isPublic || isStaticAsset) {
-    // Si ya tiene sesión activa y navega explícitamente a /login, redirigir al dashboard
-    if (pathname === '/login') {
-      const token = request.cookies.get('bitacora_token')?.value || request.cookies.get('token')?.value;
-      if (token) {
-        const payload = parseJwt(token);
-        if (payload) {
-          const now = Math.floor(Date.now() / 1000);
-          if (!payload.exp || payload.exp > now) {
-            return NextResponse.redirect(new URL('/dashboard', request.url));
-          }
-        }
-      }
-    }
     return NextResponse.next();
   }
 
-  // Comprobar token de sesión para rutas protegidas (/dashboard, /, etc.)
+  // Raíz del proyecto siempre inicia en login
+  if (pathname === '/') {
+    return NextResponse.redirect(new URL('/login', request.url));
+  }
+
+  // Comprobar token de sesión para rutas protegidas (/dashboard, etc.)
   const token = request.cookies.get('bitacora_token')?.value || request.cookies.get('token')?.value;
 
   if (!token) {
-    // No hay sesión: siempre iniciar en /login
+    // No hay sesión: redirigir a login
     return NextResponse.redirect(new URL('/login', request.url));
   }
 
@@ -79,10 +71,6 @@ export function middleware(request: NextRequest) {
     response.cookies.delete('bitacora_token');
     response.cookies.delete('token');
     return response;
-  }
-
-  if (pathname === '/') {
-    return NextResponse.redirect(new URL('/dashboard', request.url));
   }
 
   return NextResponse.next();

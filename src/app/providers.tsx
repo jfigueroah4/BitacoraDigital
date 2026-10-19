@@ -4,6 +4,28 @@ import React from 'react';
 import { Toaster } from 'sonner';
 
 export default function Providers({ children }: { children: React.ReactNode }) {
+  React.useEffect(() => {
+    try {
+      const currentBuild = process.env.NEXT_PUBLIC_BUILD_TIME;
+      if (currentBuild) {
+        const storedBuild = localStorage.getItem('bitacora_build_id');
+        if (storedBuild && storedBuild !== currentBuild) {
+          // Se detectó un nuevo despliegue o reinicio del servidor
+          localStorage.removeItem('bitacora_user_profile');
+          localStorage.removeItem('bitacora_session_expiry');
+          localStorage.setItem('bitacora_build_id', currentBuild);
+          document.cookie = 'bitacora_token=; path=/; max-age=0';
+          document.cookie = 'token=; path=/; max-age=0';
+          if (window.location.pathname !== '/login') {
+            window.location.href = '/login';
+          }
+          return;
+        }
+        localStorage.setItem('bitacora_build_id', currentBuild);
+      }
+    } catch (_) {}
+  }, []);
+
   return (
     <>
       <style
