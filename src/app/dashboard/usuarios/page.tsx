@@ -9,6 +9,7 @@ import { Usuario, RolUsuario, EstadoUsuario } from '@/types/usuario';
 import { UsuarioTabla } from '@/components/modules/usuarios/UsuarioTabla';
 import { UsuarioDrawer, UsuarioDrawerMode } from '@/components/modules/usuarios/UsuarioDrawer';
 import { UsuarioDeleteModal } from '@/components/modules/usuarios/UsuarioDeleteModal';
+import ModalDispositivosConectados from '@/components/modals/ModalDispositivosConectados';
 import { supabase } from '@/lib/supabase/client';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { showSuccessToast, showErrorToast } from '@/components/ui/Toast';
@@ -99,6 +100,10 @@ export default function UsuariosPage() {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [usuarioEliminar, setUsuarioEliminar] = useState<Usuario | undefined>();
   const [modoModalEliminar, setModoModalEliminar] = useState<'todos' | 'activar' | 'eliminar' | 'suspender'>('todos');
+
+  // Modal de Dispositivos Conectados
+  const [modalDispositivosOpen, setModalDispositivosOpen] = useState(false);
+  const [usuarioDispositivos, setUsuarioDispositivos] = useState<Usuario | undefined>();
 
   // Cargar usuarios de Supabase, API y localStorage asegurando persistencia completa
   const cargarUsuarios = useCallback(async () => {
@@ -416,16 +421,9 @@ export default function UsuariosPage() {
     setUsuarioEliminar(undefined);
   };
 
-  const handleCerrarSesionRemota = (usr: Usuario) => {
-    const actualizados = usuarios.map((u) => {
-      if (u.id === usr.id) {
-        return { ...u, estado: 'Inactivo' as EstadoUsuario, activo: true };
-      }
-      return u;
-    });
-    setUsuarios(actualizados);
-    localStorage.setItem('bitacora_usuarios_lista', JSON.stringify(actualizados));
-    showSuccessToast(`Sesión remota cerrada para ${usr.nombre}. Estado actualizado a Inactivo.`);
+  const handleGestionarDispositivos = (usr: Usuario) => {
+    setUsuarioDispositivos(usr);
+    setModalDispositivosOpen(true);
   };
 
   return (
@@ -539,7 +537,7 @@ export default function UsuariosPage() {
           onVer={handleVer}
           onEditar={handleEditar}
           onEliminar={handleOpenDelete}
-          onCerrarSesion={handleCerrarSesionRemota}
+          onGestionarDispositivos={handleGestionarDispositivos}
           currentUserEmail={currentUserEmail}
           canManage={isAdmin}
         />
@@ -622,6 +620,23 @@ export default function UsuariosPage() {
         usuario={usuarioEliminar}
         modoModal={modoModalEliminar}
       />
+
+      {/* Modal de Dispositivos Conectados */}
+      {modalDispositivosOpen && usuarioDispositivos && (
+        <ModalDispositivosConectados
+          isOpen={modalDispositivosOpen}
+          onClose={() => {
+            setModalDispositivosOpen(false);
+            setUsuarioDispositivos(undefined);
+          }}
+          usuarioCorreo={usuarioDispositivos.correo}
+          usuarioNombre={usuarioDispositivos.nombre}
+          onSesionCerrada={() => {
+            // Forzar actualización de tabla
+            setUsuarios((prev) => [...prev]);
+          }}
+        />
+      )}
     </div>
   );
 }

@@ -7,6 +7,8 @@ import { Eye, EyeOff, User, Lock, Info, X, ChevronDown, Trash2, ShieldCheck, Use
 import LoginInput from '@/components/ui/LoginInput';
 import LoginButton from '@/components/ui/LoginButton';
 import PasswordRecoveryModal from '@/components/modals/PasswordRecoveryModal';
+import ModalDispositivosConectados from '@/components/modals/ModalDispositivosConectados';
+import { registrarSesionDispositivo } from '@/lib/services/sesiones';
 import { useCustomToast } from '@/hooks/useCustomToast';
 import { UserProfile, UserRole } from '@/types/bitacora';
 import { supabase } from '@/lib/supabase/client';
@@ -67,6 +69,8 @@ export default function LoginPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [rememberedAccounts, setRememberedAccounts] = useState<SavedAccount[]>([]);
   const [showRememberedDropdown, setShowRememberedDropdown] = useState(false);
+  const [modalDispositivosOpen, setModalDispositivosOpen] = useState(false);
+  const [usuarioParaDispositivos, setUsuarioParaDispositivos] = useState<UserProfile | null>(null);
 
   const { showErrorToast, showSuccessToast } = useCustomToast();
 
@@ -304,6 +308,16 @@ export default function LoginPage() {
         })
       );
       const sessionToken = `${headerStr}.${payloadStr}.sig`;
+
+      // Registrar sesión de dispositivo (máx 2)
+      const resRegistro = registrarSesionDispositivo({ id: authUser.id, email: authUser.email });
+      if (!resRegistro.success && resRegistro.limiteAlcanzado) {
+        setUsuarioParaDispositivos(authUser);
+        setModalDispositivosOpen(true);
+        setIsSubmitting(false);
+        showErrorToast('Límite de 2 dispositivos alcanzado. Cierra una sesión previa para ingresar.');
+        return;
+      }
 
       // Guardar cookies y perfil
       document.cookie = `bitacora_token=${sessionToken}; path=/; max-age=28800; SameSite=Lax`;
@@ -775,6 +789,20 @@ export default function LoginPage() {
         isOpen={isRecoveryOpen}
         onClose={() => setIsRecoveryOpen(false)}
       />
+
+      {/* Modal de Dispositivos Conectados en Login */}
+      {modalDispositivosOpen && usuarioParaDispositivos && (
+        <ModalDispositivosConectados
+          isOpen={modalDispositivosOpen}
+          onClose={() => setModalDispositivosOpen(false)}
+          usuarioCorreo={usuarioParaDispositivos.email}
+          usuarioNombre={usuarioParaDispositivos.nombre}
+          onSesionCerrada={() => {
+            showSuccessToast('Dispositivo liberado. Ahora puedes iniciar sesión.');
+            setModalDispositivosOpen(false);
+          }}
+        />
+      )}
     </div>
   );
 }

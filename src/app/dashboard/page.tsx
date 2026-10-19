@@ -23,6 +23,7 @@ import {
   actualizarDocumentoBitacora,
   eliminarDocumentoBitacora,
 } from '@/lib/supabase/storage';
+import { registrarSesionDispositivo } from '@/lib/services/sesiones';
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -58,7 +59,13 @@ export default function DashboardPage() {
         window.location.href = '/login';
         return;
       }
-      setUserProfile(JSON.parse(storedUser));
+      const parsedUser = JSON.parse(storedUser);
+      setUserProfile(parsedUser);
+      if (parsedUser && parsedUser.email) {
+        try {
+          registrarSesionDispositivo({ id: parsedUser.id, email: parsedUser.email });
+        } catch (_) {}
+      }
 
       // Cargar duración del proyecto si existe guardada
       const storedDuracion = localStorage.getItem('bitacora_duracion_proyecto');

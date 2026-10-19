@@ -16,10 +16,12 @@ import {
   Calendar,
   LayoutDashboard,
   Shield,
+  Laptop,
 } from 'lucide-react';
 import { UserProfile } from '@/types/bitacora';
 import { MESES_NOMBRES } from '@/lib/mockData';
 import { showSuccessToast } from '@/components/ui/Toast';
+import ModalDispositivosConectados from '@/components/modals/ModalDispositivosConectados';
 
 interface TopBarProps {
   searchQuery?: string;
@@ -108,6 +110,7 @@ export default function TopBar({
   const searchContainerRef = useRef<HTMLDivElement>(null);
 
   const [profileOpen, setProfileOpen] = useState(false);
+  const [modalDispositivosOpen, setModalDispositivosOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(userProfile || null);
 
   const isAdmin = useMemo(() => {
@@ -529,6 +532,18 @@ export default function TopBar({
                   <span>Mi perfil</span>
                 </Link>
 
+                <button
+                  type="button"
+                  onClick={() => {
+                    setProfileOpen(false);
+                    setModalDispositivosOpen(true);
+                  }}
+                  className="flex items-center gap-2.5 px-4 py-2 hover:bg-gray-50 transition-colors text-[11px] text-gray-700 font-medium w-full text-left cursor-pointer"
+                >
+                  <Laptop size={13} className="text-gray-400 shrink-0" />
+                  <span>Dispositivos conectados</span>
+                </button>
+
                 {/* Usuarios y Roles - Solo Administradores */}
                 {isAdmin && (
                   <Link
@@ -576,6 +591,16 @@ export default function TopBar({
           )}
         </div>
       </div>
+
+      {/* Modal de Dispositivos Conectados */}
+      {modalDispositivosOpen && currentUser && (
+        <ModalDispositivosConectados
+          isOpen={modalDispositivosOpen}
+          onClose={() => setModalDispositivosOpen(false)}
+          usuarioCorreo={currentUser.email}
+          usuarioNombre={currentUser.nombre}
+        />
+      )}
     </header>
   );
 }

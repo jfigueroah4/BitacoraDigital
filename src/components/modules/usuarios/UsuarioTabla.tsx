@@ -1,18 +1,19 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import { Trash2, Edit2, Eye, UserX, LogOut, CheckCircle } from 'lucide-react';
+import { Trash2, Edit2, Eye, UserX, LogOut, CheckCircle, Laptop, Smartphone } from 'lucide-react';
 import { Usuario } from '@/types/usuario';
 import { UsuarioEstadoBadge } from './UsuarioEstadoBadge';
 import { UsuarioRolBadge } from './UsuarioRolBadge';
 import { formatearNombrePropio } from '@/lib/utils/formatters';
+import { obtenerSesionesUsuario } from '@/lib/services/sesiones';
 
 interface UsuarioTablaProps {
   usuarios: Usuario[];
   onVer: (usuario: Usuario) => void;
   onEditar: (usuario: Usuario) => void;
   onEliminar: (id: string, modoModal?: 'todos' | 'activar' | 'eliminar' | 'suspender') => void;
-  onCerrarSesion?: (usuario: Usuario) => void;
+  onGestionarDispositivos?: (usuario: Usuario) => void;
   currentUserEmail?: string;
   canManage?: boolean;
 }
@@ -22,7 +23,7 @@ export const UsuarioTabla = React.memo(function UsuarioTabla({
   onVer,
   onEditar,
   onEliminar,
-  onCerrarSesion,
+  onGestionarDispositivos,
   currentUserEmail,
   canManage = true,
 }: UsuarioTablaProps) {
@@ -86,6 +87,8 @@ export const UsuarioTabla = React.memo(function UsuarioTabla({
           ).toUpperCase();
           const isSelf = currentUserEmail && usuario.correo?.toLowerCase() === currentUserEmail.toLowerCase();
           const esSuspendido = usuario.estado === 'Suspendido' || usuario.estado === 'Inactivo' || (usuario as any).activo === false;
+          const sesiones = obtenerSesionesUsuario(usuario.correo);
+          const tieneSesiones = sesiones.length > 0;
 
           return (
             <div
@@ -139,14 +142,19 @@ export const UsuarioTabla = React.memo(function UsuarioTabla({
                   <span>Editar</span>
                 </button>}
 
-                {canManage && usuario.estado === 'Activo' && !isSelf && (
+                {canManage && (isSelf || tieneSesiones) && (
                   <button
                     type="button"
-                    onClick={() => onCerrarSesion?.(usuario)}
-                    className="p-1.5 rounded-lg border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 cursor-pointer shadow-2xs"
-                    title="Cerrar sesión activa"
+                    onClick={() => onGestionarDispositivos?.(usuario)}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-gray-200 bg-white text-gray-700 text-[10px] font-semibold hover:bg-gray-50 cursor-pointer shadow-2xs relative"
+                    title={
+                      isSelf
+                        ? 'Gestionar mis dispositivos conectados'
+                        : `Dispositivos conectados (${sesiones.length} de 2)`
+                    }
                   >
-                    <LogOut size={12} className="text-gray-600" />
+                    <Laptop size={12} className="text-gray-600" />
+                    <span>{isSelf ? 'Mis Equipos' : `Equipos (${sesiones.length})`}</span>
                   </button>
                 )}
 
@@ -239,6 +247,8 @@ export const UsuarioTabla = React.memo(function UsuarioTabla({
                 ).toUpperCase();
                 const isSelf = currentUserEmail && usuario.correo?.toLowerCase() === currentUserEmail.toLowerCase();
                 const esSuspendido = usuario.estado === 'Suspendido' || usuario.estado === 'Inactivo' || (usuario as any).activo === false;
+                const sesiones = obtenerSesionesUsuario(usuario.correo);
+                const tieneSesiones = sesiones.length > 0;
 
                 return (
                   <tr key={usuario.id} className="hover:bg-gray-50/70 transition-colors">
@@ -294,14 +304,23 @@ export const UsuarioTabla = React.memo(function UsuarioTabla({
                           <Edit2 size={13} />
                         </button>}
 
-                        {canManage && usuario.estado === 'Activo' && !isSelf && (
+                        {canManage && (isSelf || tieneSesiones) && (
                           <button
                             type="button"
-                            onClick={() => onCerrarSesion?.(usuario)}
-                            className="p-1 text-gray-400 hover:text-amber-600 transition-colors cursor-pointer"
-                            title="Cerrar sesión activa"
+                            onClick={() => onGestionarDispositivos?.(usuario)}
+                            className="p-1 text-gray-400 hover:text-[#3B2219] transition-colors cursor-pointer relative"
+                            title={
+                              isSelf
+                                ? 'Gestionar mis dispositivos conectados'
+                                : `Dispositivos conectados (${sesiones.length} de 2)`
+                            }
                           >
-                            <LogOut size={13} />
+                            <Laptop size={13} />
+                            {sesiones.length > 1 && (
+                              <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-amber-500 rounded-full text-[7px] text-white flex items-center justify-center font-bold">
+                                {sesiones.length}
+                              </span>
+                            )}
                           </button>
                         )}
 

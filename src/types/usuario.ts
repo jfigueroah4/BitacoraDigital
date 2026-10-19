@@ -31,3 +31,14 @@ export interface Usuario {
   proyectosAsignados?: string[];
   proyectos_activos_count?: number;
 }
+
+export interface DispositivoSesion {
+  id: string; // deviceId
+  usuarioId?: string;
+  usuarioCorreo: string;
+  dispositivo: string;
+  fechaHora: string;
+  ip?: string;
+  esActual?: boolean;
+}
+
