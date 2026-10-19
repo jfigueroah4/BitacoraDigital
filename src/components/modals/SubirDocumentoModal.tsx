@@ -17,6 +17,7 @@ import { DocumentoBitacora } from '@/types/bitacora';
 import { MESES_NOMBRES, getDiasEnMes, DuracionProyecto } from '@/lib/mockData';
 import { subirDocumentoBitacora, formatearBytes } from '@/lib/supabase/storage';
 import { showSuccessToast, showErrorToast } from '@/components/ui/Toast';
+import { Portal } from '@/components/ui/Portal';
 
 interface SubirDocumentoModalProps {
   isOpen: boolean;
@@ -33,18 +34,20 @@ interface SubirDocumentoModalProps {
 export default function SubirDocumentoModal({
   isOpen,
   onClose,
-  diaSugerido = new Date().getDate(),
-  mesSugerido = new Date().getMonth() + 1,
-  anioSugerido = 2026,
+  diaSugerido,
+  mesSugerido,
+  anioSugerido,
   usuarioNombre,
   onDocumentoSubido,
   documentosExistentes = [],
   duracionProyecto,
 }: SubirDocumentoModalProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [dia, setDia] = useState<number>(diaSugerido);
-  const [mes, setMes] = useState<number>(mesSugerido);
-  const [anio, setAnio] = useState<number>(anioSugerido);
+
+  const hoyInicial = new Date();
+  const [dia, setDia] = useState<number>(() => Number(diaSugerido) || hoyInicial.getDate());
+  const [mes, setMes] = useState<number>(() => Number(mesSugerido) || hoyInicial.getMonth() + 1);
+  const [anio, setAnio] = useState<number>(() => Number(anioSugerido) || hoyInicial.getFullYear());
   const [titulo, setTitulo] = useState('');
   const [descripcion, setDescripcion] = useState('');
   const [archivo, setArchivo] = useState<File | null>(null);
@@ -52,21 +55,35 @@ export default function SubirDocumentoModal({
   const [mostrarConfirmacion, setMostrarConfirmacion] = useState(false);
   const [subiendo, setSubiendo] = useState(false);
 
+  // Documentos válidos existentes
+  const docsValidos = useMemo(() => {
+    if (!Array.isArray(documentosExistentes)) return [];
+    return documentosExistentes.filter((d) => Boolean(d && typeof d === 'object'));
+  }, [documentosExistentes]);
+
   // Documentos que ya existen en el mes y año seleccionados
   const docsEnMes = useMemo(() => {
-    return (documentosExistentes || []).filter((d) => d.mes === mes && d.anio === anio);
-  }, [documentosExistentes, mes, anio]);
+    return docsValidos.filter(
+      (d) => Number(d.mes) === Number(mes) && Number(d.anio) === Number(anio)
+    );
+  }, [docsValidos, mes, anio]);
 
   const docExistenteEnDia = useMemo(() => {
-    return docsEnMes.find((d) => d.dia === dia) || null;
+    return docsEnMes.find((d) => Number(d.dia) === Number(dia)) || null;
   }, [docsEnMes, dia]);
 
   // Validar si la fecha está dentro de la duración establecida del proyecto
   const fueraDeDuracion = useMemo(() => {
     if (!duracionProyecto) return false;
-    const { anioInicio, mesInicio, anioFin, mesFin } = duracionProyecto;
-    if (anio < anioInicio || (anio === anioInicio && mes < mesInicio)) return true;
-    if (anio > anioFin || (anio === anioFin && mes > mesFin)) return true;
+    const aInicio = Number(duracionProyecto.anioInicio);
+    const mInicio = Number(duracionProyecto.mesInicio);
+    const aFin = Number(duracionProyecto.anioFin);
+    const mFin = Number(duracionProyecto.mesFin);
+
+    if (isNaN(aInicio) || isNaN(mInicio) || isNaN(aFin) || isNaN(mFin)) return false;
+
+    if (anio < aInicio || (anio === aInicio && mes < mInicio)) return true;
+    if (anio > aFin || (anio === aFin && mes > mFin)) return true;
     return false;
   }, [duracionProyecto, mes, anio]);
 
@@ -74,9 +91,9 @@ export default function SubirDocumentoModal({
   useEffect(() => {
     if (isOpen) {
       const hoy = new Date();
-      setDia(diaSugerido ?? hoy.getDate());
-      setMes(mesSugerido ?? (hoy.getMonth() + 1));
-      setAnio(anioSugerido ?? hoy.getFullYear());
+      setDia(Number(diaSugerido) || hoy.getDate());
+      setMes(Number(mesSugerido) || hoy.getMonth() + 1);
+      setAnio(Number(anioSugerido) || hoy.getFullYear());
       setArchivo(null);
       setTitulo('');
       setDescripcion('');
@@ -97,21 +114,28 @@ export default function SubirDocumentoModal({
 
   if (!isOpen) return null;
 
-  const diasEnMesActual = getDiasEnMes(mes, anio);
+  const diasEnMesActual = Math.max(1, getDiasEnMes(mes || 1, anio || 2026) || 31);
 
   // Años disponibles basados en el proyecto
-  const aniosDisponibles = useMemo(() => {
-    if (!duracionProyecto) {
-      return [2024, 2025, 2026, 2027, 2028, 2029, 2030];
-    }
-    const min = Math.min(duracionProyecto.anioInicio, 2024);
-    const max = Math.max(duracionProyecto.anioFin, 2030);
+  const aniosDisponibles = (() => {
+    const fallback = [
+      2020, 2021, 2022, 2023, 2024, 2025, 2026, 2027, 2028, 2029,
+      2030, 2031, 2032, 2033, 2034, 2035, 2036, 2037, 2038, 2039,
+      2040, 2041, 2042, 2043, 2044, 2045
+    ];
+    if (!duracionProyecto) return fallback;
+    const aIni = Number(duracionProyecto.anioInicio);
+    const aFin = Number(duracionProyecto.anioFin);
+    if (isNaN(aIni) || isNaN(aFin)) return fallback;
+
+    const min = Math.min(aIni, 2020);
+    const max = Math.max(aFin, 2035);
     const lista: number[] = [];
     for (let y = min; y <= max; y++) {
       lista.push(y);
     }
-    return lista;
-  }, [duracionProyecto]);
+    return lista.length > 0 ? lista : fallback;
+  })();
 
   const handleFileSelect = (file: File) => {
     if (!file.name.toLowerCase().endsWith('.pdf') && file.type !== 'application/pdf') {
@@ -165,8 +189,8 @@ export default function SubirDocumentoModal({
       onDocumentoSubido(nuevoDoc);
       showSuccessToast(
         docExistenteEnDia
-          ? `¡Folio del día ${dia} de ${MESES_NOMBRES[mes - 1]} actualizado exitosamente!`
-          : `¡Bitácora del día ${dia} de ${MESES_NOMBRES[mes - 1]} subida exitosamente!`
+          ? `¡Folio del día ${dia} de ${MESES_NOMBRES[mes - 1] || 'mes'} actualizado exitosamente!`
+          : `¡Bitácora del día ${dia} de ${MESES_NOMBRES[mes - 1] || 'mes'} subida exitosamente!`
       );
       // Limpiar y cerrar
       setArchivo(null);
@@ -182,21 +206,21 @@ export default function SubirDocumentoModal({
     }
   };
 
-  const esPesoOptimo = archivo && archivo.size <= 500 * 1024;
-  const esPesoAceptable = archivo && archivo.size <= 2 * 1024 * 1024;
+  const esPesoOptimo = Boolean(archivo && archivo.size <= 500 * 1024);
+  const esPesoAceptable = Boolean(archivo && archivo.size <= 2 * 1024 * 1024);
 
   return (
-    <>
+    <Portal>
       {/* Backdrop */}
       <div
-        className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs transition-opacity animate-fadeIn"
+        className="fixed inset-0 z-[9999] bg-black/50 backdrop-blur-[2px] transition-opacity animate-fadeIn"
         onClick={() => {
           if (!subiendo) onClose();
         }}
       />
 
       {/* Drawer Lateral */}
-      <div className="fixed inset-y-0 right-0 z-50 w-full max-w-md bg-white shadow-2xl flex flex-col font-poppins animate-slideInRight border-l border-gray-100">
+      <div className="fixed inset-y-0 right-0 z-[10000] w-full max-w-md bg-white shadow-2xl flex flex-col font-poppins animate-slideInRight border-l border-gray-100">
         {/* Header del Drawer */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 bg-gray-50/80 shrink-0">
           <div className="flex items-center gap-2.5">
@@ -246,7 +270,7 @@ export default function SubirDocumentoModal({
                       className="w-full px-2.5 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 outline-none focus:border-[#3B2219] cursor-pointer"
                     >
                       {Array.from({ length: diasEnMesActual }, (_, i) => i + 1).map((d) => {
-                        const tieneDoc = docsEnMes.some((doc) => doc.dia === d);
+                        const tieneDoc = docsEnMes.some((doc) => doc && Number(doc.dia) === d);
                         return (
                           <option key={d} value={d}>
                             {d} {tieneDoc ? '(Con folio)' : ''}
@@ -310,7 +334,7 @@ export default function SubirDocumentoModal({
                     <div>
                       <p className="font-bold">Fecha fuera del periodo del proyecto</p>
                       <p className="text-[10.5px] text-amber-700 mt-0.5">
-                        El proyecto está establecido desde <strong>{MESES_NOMBRES[duracionProyecto.mesInicio - 1]} {duracionProyecto.anioInicio}</strong> hasta <strong>{MESES_NOMBRES[duracionProyecto.mesFin - 1]} {duracionProyecto.anioFin}</strong>.
+                        El proyecto está establecido desde <strong>{MESES_NOMBRES[(duracionProyecto.mesInicio || 1) - 1]} {duracionProyecto.anioInicio}</strong> hasta <strong>{MESES_NOMBRES[(duracionProyecto.mesFin || 12) - 1]} {duracionProyecto.anioFin}</strong>.
                       </p>
                     </div>
                   </div>
@@ -323,7 +347,7 @@ export default function SubirDocumentoModal({
                     <div>
                       <p className="font-bold">Ya existe un folio en esta fecha</p>
                       <p className="text-[10.5px] text-blue-700 mt-0.5">
-                        El <strong>Día {dia} de {MESES_NOMBRES[mes - 1]} {anio}</strong> ya tiene el folio: <em>"{docExistenteEnDia.titulo}"</em>. Al subir este nuevo archivo, <strong>se actualizará el registro existente</strong>.
+                        El <strong>Día {dia} de {MESES_NOMBRES[(mes || 1) - 1]} {anio}</strong> ya tiene el folio: <em>"{docExistenteEnDia.titulo || 'Folio'}"</em>. Al subir este nuevo archivo, <strong>se actualizará el registro existente</strong>.
                       </p>
                     </div>
                   </div>
@@ -445,7 +469,7 @@ export default function SubirDocumentoModal({
                 </h4>
                 <p className="text-[11px] text-gray-500 mt-1">
                   {docExistenteEnDia
-                    ? `Se actualizará el folio existente para el Día ${dia} de ${MESES_NOMBRES[mes - 1]} ${anio}.`
+                    ? `Se actualizará el folio existente para el Día ${dia} de ${MESES_NOMBRES[(mes || 1) - 1]} ${anio}.`
                     : 'El documento se guardará de inmediato y estará disponible en el calendario de obra.'}
                 </p>
               </div>
@@ -454,7 +478,7 @@ export default function SubirDocumentoModal({
                 <div className="flex justify-between">
                   <span className="text-gray-500">Fecha asignada:</span>
                   <span className="font-bold text-gray-800">
-                    Día {dia} de {MESES_NOMBRES[mes - 1]} de {anio}
+                    Día {dia} de {MESES_NOMBRES[(mes || 1) - 1]} de {anio}
                   </span>
                 </div>
                 {docExistenteEnDia && (
@@ -535,6 +559,6 @@ export default function SubirDocumentoModal({
           )}
         </div>
       </div>
-    </>
+    </Portal>
   );
 }

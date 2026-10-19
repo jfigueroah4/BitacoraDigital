@@ -3,6 +3,7 @@
 import React from 'react';
 import { Trash2, X, AlertTriangle, FileText } from 'lucide-react';
 import { DocumentoBitacora } from '@/types/bitacora';
+import { Portal } from '@/components/ui/Portal';
 
 interface EliminarDocumentoModalProps {
   documento: DocumentoBitacora | null;
@@ -22,12 +23,12 @@ export default function EliminarDocumentoModal({
   if (!isOpen || !documento) return null;
 
   return (
-    <>
+    <Portal>
       <div
-        className="fixed inset-0 z-[120] bg-black/50 backdrop-blur-xs animate-fadeIn"
+        className="fixed inset-0 z-[9999] bg-black/50 backdrop-blur-xs animate-fadeIn"
         onClick={() => !eliminando && onClose()}
       />
-      <div className="fixed left-1/2 top-1/2 z-[130] w-[92vw] max-w-[420px] -translate-x-1/2 -translate-y-1/2 font-poppins animate-scaleIn">
+      <div className="fixed left-1/2 top-1/2 z-[10000] w-[92vw] max-w-[420px] -translate-x-1/2 -translate-y-1/2 font-poppins animate-scaleIn">
         <div className="relative overflow-hidden rounded-2xl bg-white p-5 sm:p-6 shadow-2xl border border-gray-100">
           {/* Barra superior con gradiente de peligro */}
           <div className="absolute left-0 top-0 h-1 w-full bg-gradient-to-r from-red-500 to-[#3B2219]" />
@@ -58,22 +59,30 @@ export default function EliminarDocumentoModal({
 
           {/* Tarjeta con los datos del folio a eliminar */}
           <div className="my-4 rounded-xl border border-gray-200 bg-gray-50/70 p-3 text-xs space-y-1.5">
-            <div className="flex items-center gap-2 text-gray-900 font-bold truncate">
-              <FileText size={14} className="text-[#3B2219] shrink-0" />
+            <div className="flex items-center gap-2 text-gray-800 font-bold">
+              <FileText size={14} className="text-[#3B2219]" />
               <span className="truncate">{documento.titulo}</span>
             </div>
             <div className="flex justify-between text-[11px] text-gray-500 pt-1 border-t border-gray-200/60">
-              <span>Fecha: {documento.fecha} (Día {documento.dia})</span>
-              <span className="font-semibold text-gray-700">{documento.pesoFormateado}</span>
+              <span>Fecha:</span>
+              <span className="font-semibold text-gray-700">
+                Día {documento.dia}/{documento.mes}/{documento.anio}
+              </span>
+            </div>
+            <div className="flex justify-between text-[11px] text-gray-500">
+              <span>Archivo:</span>
+              <span className="font-semibold text-gray-700 truncate max-w-[190px]">
+                {documento.nombreArchivo}
+              </span>
             </div>
           </div>
 
-          <div className="flex items-center justify-end gap-2 pt-1">
+          <div className="flex gap-2.5">
             <button
               type="button"
               onClick={onClose}
               disabled={eliminando}
-              className="px-4 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-100 rounded-xl transition-colors cursor-pointer"
+              className="flex-1 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs py-2.5 transition-colors cursor-pointer"
             >
               Cancelar
             </button>
@@ -81,14 +90,13 @@ export default function EliminarDocumentoModal({
               type="button"
               onClick={onConfirm}
               disabled={eliminando}
-              className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-xl transition-colors shadow-2xs disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
+              className="flex-1 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs py-2.5 transition-colors shadow-2xs cursor-pointer disabled:opacity-50"
             >
-              <Trash2 size={13} />
-              <span>{eliminando ? 'Eliminando...' : 'Eliminar Folio'}</span>
+              {eliminando ? 'Eliminando...' : 'Sí, eliminar'}
             </button>
           </div>
         </div>
       </div>
-    </>
+    </Portal>
   );
 }

@@ -21,6 +21,7 @@ import { DocumentoBitacora } from '@/types/bitacora';
 import { MESES_NOMBRES, getDiasEnMes } from '@/lib/mockData';
 import { subirDocumentoBitacora, formatearBytes } from '@/lib/supabase/storage';
 import { showSuccessToast, showErrorToast } from '@/components/ui/Toast';
+import { Portal } from '@/components/ui/Portal';
 
 export interface ItemCargaMultiple {
   id: string;
@@ -35,8 +36,8 @@ export interface ItemCargaMultiple {
 interface CargaMultipleDrawerProps {
   isOpen: boolean;
   onClose: () => void;
-  mesActual: number;
-  anioActual: number;
+  mesActual?: number;
+  anioActual?: number;
   usuarioNombre: string;
   onDocumentosSubidos: (docs: DocumentoBitacora[]) => void;
   mesBloqueado?: boolean;
@@ -56,36 +57,48 @@ export default function CargaMultipleDrawer({
   mesBloqueado = false,
   documentosExistentes = [],
 }: CargaMultipleDrawerProps) {
-  const [items, setItems] = useState<ItemCargaMultiple[]>([]);
+  const hoyInicial = new Date();
+  const diaHoyInicial = hoyInicial.getDate();
+  const mesRefInicial = Number(mesActual) || hoyInicial.getMonth() + 1;
+  const anioRefInicial = Number(anioActual) || hoyInicial.getFullYear();
+  const maxDiasInicial = getDiasEnMes(mesRefInicial, anioRefInicial) || 31;
+
+  // Inicializar items con 3 elementos por defecto para evitar estado vacío
+  const [items, setItems] = useState<ItemCargaMultiple[]>(() =>
+    Array.from({ length: 3 }, (_, i) => ({
+      id: `item-${Date.now()}-${i}`,
+      dia: Math.min(maxDiasInicial, Math.max(1, diaHoyInicial + i)),
+      mes: mesRefInicial,
+      anio: anioRefInicial,
+      titulo: '',
+      descripcion: '',
+      archivo: null,
+    }))
+  );
+
   const [subiendo, setSubiendo] = useState(false);
   const [progresoActual, setProgresoActual] = useState({ actual: 0, total: 0 });
   const [paginaActual, setPaginaActual] = useState(1);
   const [cantidadPersonalizada, setCantidadPersonalizada] = useState('3');
 
-  // Inicializar items al abrir el drawer
+  // Sincronizar items al abrir el drawer
   useEffect(() => {
     if (isOpen) {
       const hoy = new Date();
       const diaHoy = hoy.getDate();
-      const mesInicial = mesActual || (hoy.getMonth() + 1);
-      const anioInicial = anioActual || hoy.getFullYear();
+      const mesInicial = Number(mesActual) || hoy.getMonth() + 1;
+      const anioInicial = Number(anioActual) || hoy.getFullYear();
+      const maxDias = getDiasEnMes(mesInicial, anioInicial) || 31;
 
-      // Iniciar con 3 items con fechas consecutivas
-      const itemsIniciales: ItemCargaMultiple[] = Array.from({ length: 3 }, (_, i) => {
-        const diaCalculado = Math.min(
-          getDiasEnMes(mesInicial, anioInicial),
-          Math.max(1, diaHoy + i)
-        );
-        return {
-          id: `item-${Date.now()}-${i}`,
-          dia: diaCalculado,
-          mes: mesInicial,
-          anio: anioInicial,
-          titulo: '',
-          descripcion: '',
-          archivo: null,
-        };
-      });
+      const itemsIniciales: ItemCargaMultiple[] = Array.from({ length: 3 }, (_, i) => ({
+        id: `item-${Date.now()}-${i}`,
+        dia: Math.min(maxDias, Math.max(1, diaHoy + i)),
+        mes: mesInicial,
+        anio: anioInicial,
+        titulo: '',
+        descripcion: '',
+        archivo: null,
+      }));
 
       setItems(itemsIniciales);
       setPaginaActual(1);
@@ -107,7 +120,7 @@ export default function CargaMultipleDrawer({
   }, [isOpen, subiendo, onClose]);
 
   // Total de páginas calculadas
-  const totalPaginas = Math.ceil(items.length / ITEMS_POR_PAGINA) || 1;
+  const totalPaginas = Math.max(1, Math.ceil(items.length / ITEMS_POR_PAGINA));
 
   // Asegurar que la página actual no sobrepase el total
   useEffect(() => {
@@ -115,6 +128,12 @@ export default function CargaMultipleDrawer({
       setPaginaActual(totalPaginas);
     }
   }, [totalPaginas, paginaActual]);
+
+  // Lista segura de documentos existentes
+  const docsValidos = useMemo(() => {
+    if (!Array.isArray(documentosExistentes)) return [];
+    return documentosExistentes.filter((d) => Boolean(d && typeof d === 'object'));
+  }, [documentosExistentes]);
 
   if (!isOpen) return null;
 
@@ -127,9 +146,9 @@ export default function CargaMultipleDrawer({
       const hoy = new Date();
       const nuevos: ItemCargaMultiple[] = Array.from({ length: diff }, (_, i) => {
         const ultimoItem = items[items.length - 1];
-        const mesRef = mesBloqueado ? mesActual : ultimoItem ? ultimoItem.mes : mesActual || (hoy.getMonth() + 1);
-        const anioRef = mesBloqueado ? anioActual : ultimoItem ? ultimoItem.anio : anioActual || hoy.getFullYear();
-        const maxDias = getDiasEnMes(mesRef, anioRef);
+        const mesRef = mesBloqueado ? Number(mesActual) || (hoy.getMonth() + 1) : ultimoItem ? ultimoItem.mes : (hoy.getMonth() + 1);
+        const anioRef = mesBloqueado ? Number(anioActual) || hoy.getFullYear() : ultimoItem ? ultimoItem.anio : hoy.getFullYear();
+        const maxDias = getDiasEnMes(mesRef, anioRef) || 31;
         const diaSiguiente = ultimoItem ? Math.min(maxDias, ultimoItem.dia + 1) : hoy.getDate();
 
         return {
@@ -152,9 +171,9 @@ export default function CargaMultipleDrawer({
   const handleAgregarItem = () => {
     const hoy = new Date();
     const ultimoItem = items[items.length - 1];
-    const mesRef = mesBloqueado ? mesActual : ultimoItem ? ultimoItem.mes : mesActual || (hoy.getMonth() + 1);
-    const anioRef = mesBloqueado ? anioActual : ultimoItem ? ultimoItem.anio : anioActual || hoy.getFullYear();
-    const maxDias = getDiasEnMes(mesRef, anioRef);
+    const mesRef = mesBloqueado ? Number(mesActual) || (hoy.getMonth() + 1) : ultimoItem ? ultimoItem.mes : (hoy.getMonth() + 1);
+    const anioRef = mesBloqueado ? Number(anioActual) || hoy.getFullYear() : ultimoItem ? ultimoItem.anio : hoy.getFullYear();
+    const maxDias = getDiasEnMes(mesRef, anioRef) || 31;
     const diaSiguiente = ultimoItem ? Math.min(maxDias, ultimoItem.dia + 1) : hoy.getDate();
 
     const nuevos = [
@@ -171,7 +190,6 @@ export default function CargaMultipleDrawer({
     ];
     setItems(nuevos);
     setCantidadPersonalizada(String(nuevos.length));
-    // Navegar a la página donde quedó el nuevo documento
     const nuevaPagina = Math.ceil(nuevos.length / ITEMS_POR_PAGINA);
     setPaginaActual(nuevaPagina);
   };
@@ -207,9 +225,9 @@ export default function CargaMultipleDrawer({
           const updated = { ...it, [campo]: valor };
           if (campo === 'mes' || campo === 'anio') {
             const maxDias = getDiasEnMes(
-              campo === 'mes' ? valor : it.mes,
-              campo === 'anio' ? valor : it.anio
-            );
+              campo === 'mes' ? Number(valor) : it.mes,
+              campo === 'anio' ? Number(valor) : it.anio
+            ) || 31;
             if (updated.dia > maxDias) {
               updated.dia = maxDias;
             }
@@ -322,17 +340,17 @@ export default function CargaMultipleDrawer({
   const itemsPaginados = items.slice(inicioIndex, inicioIndex + ITEMS_POR_PAGINA);
 
   return (
-    <>
+    <Portal>
       {/* Backdrop */}
       <div
-        className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs transition-opacity animate-fadeIn"
+        className="fixed inset-0 z-[9999] bg-black/50 backdrop-blur-[2px] transition-opacity animate-fadeIn"
         onClick={() => {
           if (!subiendo) onClose();
         }}
       />
 
       {/* Drawer Lateral */}
-      <div className="fixed inset-y-0 right-0 z-50 w-full max-w-xl bg-white shadow-2xl flex flex-col font-poppins animate-slideInRight border-l border-gray-100">
+      <div className="fixed inset-y-0 right-0 z-[10000] w-full max-w-xl bg-white shadow-2xl flex flex-col font-poppins animate-slideInRight border-l border-gray-100">
         {/* Header del Drawer */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 bg-gray-50/80 shrink-0">
           <div className="flex items-center gap-2.5">
@@ -425,7 +443,7 @@ export default function CargaMultipleDrawer({
           <div className="px-5 py-2 bg-amber-50/70 border-b border-amber-100/80 flex items-center gap-2 text-amber-900 text-[11px]">
             <Lock size={12} className="text-amber-700 shrink-0" />
             <span>
-              Ingreso exclusivo para <strong>{MESES_NOMBRES[(mesActual || 1) - 1]} {anioActual}</strong>. Solo puedes seleccionar el día correspondiente.
+              Ingreso exclusivo para <strong>{MESES_NOMBRES[(Number(mesActual) || 1) - 1]} {Number(anioActual) || 2026}</strong>. Solo puedes seleccionar el día correspondiente.
             </span>
           </div>
         )}
@@ -448,17 +466,17 @@ export default function CargaMultipleDrawer({
           <div className="space-y-4">
             {itemsPaginados.map((item) => {
               const globalIndex = items.findIndex((it) => it.id === item.id);
-              const diasEnMes = getDiasEnMes(item.mes, item.anio);
+              const diasEnMes = Math.max(1, getDiasEnMes(Number(item.mes) || 1, Number(item.anio) || 2026) || 31);
 
               // 1. Detección de duplicado en el mismo lote
               const primerIndiceMismaFecha = items.findIndex(
-                (it) => it.dia === item.dia && it.mes === item.mes && it.anio === item.anio
+                (it) => Number(it.dia) === Number(item.dia) && Number(it.mes) === Number(item.mes) && Number(it.anio) === Number(item.anio)
               );
               const esDuplicadoEnLote = primerIndiceMismaFecha !== -1 && primerIndiceMismaFecha < globalIndex;
 
               // 2. Detección de folio preexistente en la base de datos
-              const yaExisteEnBitacora = documentosExistentes.some(
-                (d) => d.dia === item.dia && d.mes === item.mes && d.anio === item.anio
+              const yaExisteEnBitacora = docsValidos.some(
+                (d) => Number(d.dia) === Number(item.dia) && Number(d.mes) === Number(item.mes) && Number(d.anio) === Number(item.anio)
               );
 
               return (
@@ -585,7 +603,7 @@ export default function CargaMultipleDrawer({
                               : 'bg-white text-gray-800 border-gray-200 focus:border-[#3B2219] cursor-pointer'
                           }`}
                         >
-                          {[2024, 2025, 2026, 2027, 2028, 2029, 2030].map((y) => (
+                          {[2020, 2021, 2022, 2023, 2024, 2025, 2026, 2027, 2028, 2029, 2030].map((y) => (
                             <option key={y} value={y}>
                               {y}
                             </option>
@@ -786,6 +804,6 @@ export default function CargaMultipleDrawer({
           </div>
         </div>
       </div>
-    </>
+    </Portal>
   );
 }

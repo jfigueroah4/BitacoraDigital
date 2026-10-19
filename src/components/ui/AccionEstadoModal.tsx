@@ -42,9 +42,18 @@ export function AccionEstadoModal({
 
   return (
     <>
-      <div className="fixed inset-0 z-40 bg-black/45 backdrop-blur-[1px] animate-fadeIn" onClick={onClose} />
-      <div className="fixed left-1/2 top-1/2 z-50 w-[92vw] max-w-[420px] -translate-x-1/2 -translate-y-1/2 font-poppins animate-fadeIn">
-        <div className="relative overflow-hidden rounded-2xl bg-white p-5 sm:p-6 shadow-2xl border border-gray-100">
+      {/* Fondo oscuro correctamente superpuesto a toda la pantalla */}
+      <div
+        className="fixed inset-0 z-[9999] bg-black/60 backdrop-blur-xs transition-opacity animate-fadeIn"
+        onClick={onClose}
+      />
+
+      {/* Contenedor del Modal perfectamente centrado horizontal y verticalmente */}
+      <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 pointer-events-none font-poppins animate-fadeIn">
+        <div
+          className="relative w-full max-w-[420px] overflow-hidden rounded-2xl bg-white p-5 sm:p-6 shadow-2xl border border-gray-100 pointer-events-auto"
+          onClick={(e) => e.stopPropagation()}
+        >
           <div
             className={`absolute left-0 top-0 h-1 w-full ${
               esModoActivar
