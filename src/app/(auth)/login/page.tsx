@@ -87,7 +87,11 @@ export default function LoginPage() {
     } catch (err) {
       console.error('Error cargando cuentas recordadas:', err);
     }
-  }, []);
+
+    try {
+      router.prefetch('/dashboard');
+    } catch (_) {}
+  }, [router]);
 
   const removeRememberedAccount = (usernameToRemove: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -322,9 +326,8 @@ export default function LoginPage() {
 
       showSuccessToast('¡Sesión iniciada correctamente!');
 
-      setTimeout(() => {
-        window.location.href = '/dashboard';
-      }, 250);
+      // Redirección inmediata sin esperas (estilo DomunNet)
+      window.location.replace('/dashboard');
     } catch (err: any) {
       showErrorToast('Error al iniciar sesión. Intenta nuevamente.');
     } finally {
@@ -343,20 +346,23 @@ export default function LoginPage() {
         fontFamily: "'Poppins', sans-serif",
       }}
     >
-      {/* Fondo de alta resolución con carretas */}
+      {/* Fondo de alta resolución precargado con máxima prioridad y aceleración por GPU */}
       <div
         aria-hidden="true"
-        className="absolute inset-0 overflow-hidden pointer-events-none"
-        style={{
-          backgroundImage: 'url(/img.jpg)',
-          backgroundSize: 'cover',
-          backgroundPosition: 'center 40%',
-          backgroundAttachment: 'fixed',
-        }}
+        className="absolute inset-0 overflow-hidden pointer-events-none select-none"
       >
+        <Image
+          src="/img.jpg"
+          alt="Fondo Carretera"
+          fill
+          priority
+          sizes="100vw"
+          quality={85}
+          className="object-cover object-[center_40%] pointer-events-none"
+        />
         {/* Capa de contraste oscuro para máxima nitidez y legibilidad */}
-        <div className="absolute inset-0 bg-black/45" />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-transparent to-black/60" />
+        <div className="absolute inset-0 bg-black/45 pointer-events-none" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-transparent to-black/60 pointer-events-none" />
       </div>
 
       {/* TOP NAVBAR: Botón de Acceso Rápido / Demo */}

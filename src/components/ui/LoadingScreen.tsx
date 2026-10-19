@@ -16,15 +16,15 @@ export default function LoadingScreen() {
   }, []);
 
   useEffect(() => {
-    // Iniciar desvanecimiento a los 750ms
+    // Iniciar desvanecimiento ágil a los 350ms
     const fadeTimer = setTimeout(() => {
       setFade(true);
-    }, 750);
+    }, 350);
 
-    // Desmontar completamente a los 1200ms
+    // Desmontar completamente a los 650ms
     const unmountTimer = setTimeout(() => {
       setShow(false);
-    }, 1200);
+    }, 650);
 
     return () => {
       clearTimeout(fadeTimer);
@@ -42,12 +42,12 @@ export default function LoadingScreen() {
           handleFinish();
         }
       }}
-      className={`loading-screen fixed inset-0 z-[9999] flex flex-col items-center justify-center transition-all duration-400 ease-out ${
+      className={`loading-screen fixed inset-0 z-[9999] flex flex-col items-center justify-center transition-all duration-300 ease-out ${
         isDarkTheme ? 'bg-[#140B07]' : 'bg-[#F3F4F7]'
       } ${fade ? 'opacity-0 pointer-events-none invisible' : 'opacity-100 pointer-events-auto'}`}
       style={{
         // Respaldo CSS nativo por si se interrumpe el ciclo de React
-        animation: 'screenFadeOut 0.4s ease-out 0.8s forwards',
+        animation: 'screenFadeOut 0.3s ease-out 0.4s forwards',
       }}
       onAnimationEnd={handleFinish}
     >
