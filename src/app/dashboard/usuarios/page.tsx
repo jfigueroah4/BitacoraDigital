@@ -613,7 +613,7 @@ export default function UsuariosPage() {
 
             {/* Pestañas de Estado (Desktop) */}
             <div className="hidden sm:flex items-center gap-0.5 bg-gray-100 p-0.5 rounded-xl">
-              {(['Todos', 'Activo', 'Inactivo', 'Suspendido'] as const).map((est) => (
+              {(['Todos', 'Activo', 'Suspendido'] as const).map((est) => (
                 <button
                   key={est}
                   type="button"
@@ -747,12 +747,13 @@ export default function UsuariosPage() {
           onClose={() => {
             setModalDispositivosOpen(false);
             setUsuarioDispositivos(undefined);
+            cargarUsuarios();
           }}
           usuarioCorreo={usuarioDispositivos.correo}
           usuarioNombre={usuarioDispositivos.nombre}
           onSesionCerrada={() => {
-            // Forzar actualización de tabla
-            setUsuarios((prev) => [...prev]);
+            // Forzar actualización inmediata de tabla y sesiones
+            cargarUsuarios();
           }}
         />
       )}

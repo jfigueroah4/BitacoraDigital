@@ -80,21 +80,25 @@ export async function POST(req: NextRequest) {
       duracionServidor = nuevaDuracion;
 
       // 1. Guardar en Supabase Storage para que se refleje inmediatamente en todos los clientes
-      if (supabaseAdmin) {
-        try {
-          const blob = new Blob([JSON.stringify(nuevaDuracion)], {
-            type: 'application/json',
-          });
-          await supabaseAdmin.storage
-            .from('Bitacora-documentos')
-            .upload('config/duracion.json', blob, {
-              upsert: true,
-              cacheControl: '0',
-              contentType: 'application/json',
-            });
-        } catch (storageErr) {
-          console.warn('[API Config POST] Error guardando en Supabase Storage:', storageErr);
-        }
+      try {
+        const serviceKey =
+          process.env.SUPABASE_SERVICE_ROLE_KEY ||
+          'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im56Zm1wa3ByZW5lemN1dnNob21kIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc5MjA5NTk2NSwiZXhwIjoyMTA3NjcxOTY1fQ.FSbkPuU06Yo6dkmBUsNdVdKgopQa9bzvW229cY0hPug';
+        await fetch(
+          'https://nzfmpkprenezcuvshomd.supabase.co/storage/v1/object/Bitacora-documentos/config/duracion.json',
+          {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${serviceKey}`,
+              'apikey': serviceKey,
+              'Content-Type': 'application/json',
+              'x-upsert': 'true',
+            },
+            body: JSON.stringify(nuevaDuracion),
+          }
+        );
+      } catch (storageErr) {
+        console.warn('[API Config POST] Error guardando en Supabase Storage:', storageErr);
       }
 
       const res = NextResponse.json({ success: true, duracion: nuevaDuracion });

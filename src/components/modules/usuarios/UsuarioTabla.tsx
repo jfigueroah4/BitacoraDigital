@@ -114,7 +114,7 @@ export const UsuarioTabla = React.memo(function UsuarioTabla({
           const esSuspendido = usuario.estado === 'Suspendido' || (usuario as any).activo === false;
           const sesiones = obtenerSesionesUsuario(usuario.correo);
           const tieneSesiones = sesiones.length > 0;
-          const estadoMostrado: EstadoUsuario = esSuspendido ? 'Suspendido' : (tieneSesiones ? 'Activo' : 'Inactivo');
+          const estadoMostrado: EstadoUsuario = esSuspendido ? 'Suspendido' : 'Activo';
 
 
           return (
@@ -154,7 +154,7 @@ export const UsuarioTabla = React.memo(function UsuarioTabla({
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-gray-400 font-semibold uppercase text-[9px]">Cantidad de Ingresos:</span>
-                  <span className="font-bold text-gray-900">{usuario.contadorAccesos || (tieneSesiones ? 1 : 0)} {usuario.contadorAccesos === 1 ? 'ingreso' : 'ingresos'}</span>
+                  <span className="font-bold text-gray-900">{sesiones.length} {sesiones.length === 1 ? 'ingreso' : 'ingresos'}</span>
                 </div>
               </div>
 
@@ -338,7 +338,7 @@ export const UsuarioTabla = React.memo(function UsuarioTabla({
                       {usuario.ultimoAcceso || 'Sin accesos todavía'}
                     </td>
                     <td className="px-4 py-3.5 text-[11px] font-semibold text-gray-900">
-                      {usuario.contadorAccesos || (tieneSesiones ? 1 : 0)} {usuario.contadorAccesos === 1 ? 'ingreso' : 'ingresos'}
+                      {sesiones.length} {sesiones.length === 1 ? 'ingreso' : 'ingresos'}
                     </td>
                     <td className="text-right px-4 py-3.5">
                       <div className="flex items-center justify-end gap-1">

@@ -179,10 +179,10 @@ function ComboboxAnio({
   const [query, setQuery] = useState(String(value));
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Lista de 10+ años desde 2026 (2026 a 2036+, más años recientes 2024 y 2025)
+  // Lista completa de años disponibles
   const aniosDisponibles = useMemo(() => {
-    const list: number[] = [2024, 2025];
-    for (let y = 2026; y <= 2038; y++) {
+    const list: number[] = [];
+    for (let y = 2024; y <= 2040; y++) {
       list.push(y);
     }
     return list;
@@ -212,10 +212,14 @@ function ComboboxAnio({
   }, [query, value, onChange]);
 
   const aniosFiltrados = useMemo(() => {
-    if (!query.trim()) return aniosDisponibles;
+    // Si la búsqueda coincide con el año actual seleccionado o está vacía, mostrar TODOS los años disponibles
+    if (!query.trim() || query.trim() === String(value)) {
+      return aniosDisponibles;
+    }
     const q = query.trim();
-    return aniosDisponibles.filter((a) => String(a).includes(q));
-  }, [query, aniosDisponibles]);
+    const filtrados = aniosDisponibles.filter((a) => String(a).includes(q));
+    return filtrados.length > 0 ? filtrados : aniosDisponibles;
+  }, [query, value, aniosDisponibles]);
 
   return (
     <div ref={containerRef} className="relative w-full">
@@ -224,8 +228,9 @@ function ComboboxAnio({
           type="number"
           value={query}
           disabled={disabled}
-          onFocus={() => {
+          onFocus={(e) => {
             setIsOpen(true);
+            e.target.select();
           }}
           onChange={(e) => {
             setQuery(e.target.value);
@@ -241,7 +246,12 @@ function ComboboxAnio({
         <button
           type="button"
           tabIndex={-1}
-          onClick={() => setIsOpen(!isOpen)}
+          onClick={() => {
+            setIsOpen(!isOpen);
+            if (!isOpen) {
+              setQuery(String(value));
+            }
+          }}
           className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 cursor-pointer p-0.5"
         >
           <ChevronDown
@@ -339,8 +349,8 @@ export default function VistaMeses({
   // Validación: la fecha de fin DEBE ser mayor a la fecha de inicio (no pueden ser iguales ni fin menor)
   const fechaInicioVal = tempAnioInicio * 12 + tempMesInicio;
   const fechaFinVal = tempAnioFin * 12 + tempMesFin;
-  const esInvalido = fechaFinVal <= fechaInicioVal;
-  const totalMesesDuracion = !esInvalido ? fechaFinVal - fechaInicioVal + 1 : 0;
+  const esInvalido = fechaFinVal < fechaInicioVal;
+  const totalMesesDuracion = !esInvalido ? Math.max(1, fechaFinVal - fechaInicioVal + 1) : 0;
 
   const handleAbrirModalDuracion = () => {
     setTempMesInicio(duracionProyecto.mesInicio);

@@ -155,17 +155,23 @@ export default function DashboardPage() {
       body: JSON.stringify(nueva),
     }).catch(() => {});
 
-    // 2. Respaldo directo a Supabase Storage desde cliente si está disponible
+    // 2. Respaldo directo a Supabase Storage desde cliente
     try {
-      import('@/lib/supabase/client').then(({ isSupabaseConfigured, supabase }) => {
-        if (isSupabaseConfigured() && supabase) {
-          const blob = new Blob([JSON.stringify(nueva)], { type: 'application/json' });
-          supabase.storage
-            .from('Bitacora-documentos')
-            .upload('config/duracion.json', blob, { upsert: true, cacheControl: '0' })
-            .catch(() => {});
+      const serviceKey =
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im56Zm1wa3ByZW5lemN1dnNob21kIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc5MjA5NTk2NSwiZXhwIjoyMTA3NjcxOTY1fQ.FSbkPuU06Yo6dkmBUsNdVdKgopQa9bzvW229cY0hPug';
+      fetch(
+        'https://nzfmpkprenezcuvshomd.supabase.co/storage/v1/object/Bitacora-documentos/config/duracion.json',
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${serviceKey}`,
+            'apikey': serviceKey,
+            'Content-Type': 'application/json',
+            'x-upsert': 'true',
+          },
+          body: JSON.stringify(nueva),
         }
-      });
+      ).catch(() => {});
     } catch (_) {}
 
     showSuccessToast(

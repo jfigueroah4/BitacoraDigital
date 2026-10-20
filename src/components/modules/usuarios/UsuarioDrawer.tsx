@@ -61,17 +61,7 @@ export function generarUsernameSugerido(nombre: string, apellido: string): strin
 
 // Función para generar contraseña segura en MAYÚSCULAS
 export function generarContrasenaSugerida(): string {
-  const letras = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
-  const numeros = '23456789';
-  let randLetras = '';
-  for (let i = 0; i < 4; i++) {
-    randLetras += letras.charAt(Math.floor(Math.random() * letras.length));
-  }
-  let randNums = '';
-  for (let i = 0; i < 4; i++) {
-    randNums += numeros.charAt(Math.floor(Math.random() * numeros.length));
-  }
-  return `BITACORA${randNums}${randLetras}`;
+  return 'VAS-HINCAPIE';
 }
 
 export function UsuarioDrawer({
@@ -553,10 +543,9 @@ export function UsuarioDrawer({
                     onClick={handleRegenerarUsername}
                     disabled={!primerNombre && !primerApellido}
                     title="Generar username a partir del nombre y apellido"
-                    className="inline-flex items-center gap-1 text-[10px] font-semibold text-[#9B0F06] hover:text-[#5E0006] transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                    className="p-1 text-gray-700 hover:text-black hover:bg-gray-200/60 rounded-md transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
                   >
-                    <Sparkles size={11} />
-                    <span>Autogenerar</span>
+                    <Sparkles size={14} className="text-gray-900" />
                   </button>
                 )}
               </div>
@@ -709,7 +698,6 @@ export function UsuarioDrawer({
                   className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-800 outline-none focus:border-[#9B0F06] disabled:bg-gray-100/60 cursor-pointer"
                 >
                   <option value="Activo">Activo</option>
-                  <option value="Inactivo">Inactivo</option>
                   <option value="Suspendido">Suspendido</option>
                 </select>
               </div>
@@ -750,11 +738,10 @@ export function UsuarioDrawer({
                     <button
                       type="button"
                       onClick={handleRegenerarPassword}
-                      title="Generar contraseña segura en mayúsculas"
-                      className="inline-flex items-center gap-1 text-[10px] font-semibold text-[#9B0F06] hover:text-[#5E0006] transition-colors cursor-pointer"
+                      title="Autogenerar contraseña sugerida"
+                      className="p-1 text-gray-700 hover:text-black hover:bg-gray-200/60 rounded-md transition-colors cursor-pointer"
                     >
-                      <Sparkles size={11} />
-                      <span>Autogenerar</span>
+                      <Sparkles size={14} className="text-gray-900" />
                     </button>
                   </div>
                   <div className="relative">
