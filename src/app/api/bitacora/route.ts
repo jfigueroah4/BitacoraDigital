@@ -24,6 +24,53 @@ export async function GET() {
   }
 }
 
+export async function PUT(req: NextRequest) {
+  try {
+    const body = await req.json();
+    const { id, titulo, descripcion, dia, mes, anio, url_storage, storage_path, nombre_archivo, peso_bytes, peso_formateado } = body;
+
+    if (!id) {
+      return NextResponse.json({ success: false, error: 'ID de documento requerido' }, { status: 400 });
+    }
+
+    if (!supabaseAdmin) {
+      return NextResponse.json({ success: false, error: 'Supabase admin no configurado' }, { status: 500 });
+    }
+
+    const fecha = `${anio}-${String(mes).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
+    const updatePayload: any = {
+      titulo,
+      descripcion: descripcion || '',
+      dia,
+      mes,
+      anio,
+      fecha,
+      updated_at: new Date().toISOString(),
+    };
+
+    if (url_storage) updatePayload.url_storage = url_storage;
+    if (storage_path) updatePayload.storage_path = storage_path;
+    if (nombre_archivo) updatePayload.nombre_archivo = nombre_archivo;
+    if (peso_bytes !== undefined) updatePayload.peso_bytes = peso_bytes;
+    if (peso_formateado) updatePayload.peso_formateado = peso_formateado;
+
+    const { data, error } = await supabaseAdmin
+      .from('reportes_bitacora')
+      .update(updatePayload)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) {
+      return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true, data });
+  } catch (err: any) {
+    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
+  }
+}
+
 export async function DELETE(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);

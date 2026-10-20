@@ -117,6 +117,34 @@ export async function subirDocumentoBitacora({
 }
 
 export async function obtenerReportesBitacora(): Promise<DocumentoBitacora[]> {
+  // 1. Intentar vía API backend (Service Role, sin restricciones RLS)
+  try {
+    const res = await fetch(`/api/bitacora?t=${Date.now()}`, { cache: 'no-store' });
+    if (res.ok) {
+      const json = await res.json();
+      if (json.success && Array.isArray(json.data)) {
+        return json.data.map((item: any) => ({
+          id: item.id,
+          dia: item.dia,
+          mes: item.mes,
+          anio: item.anio,
+          fecha: item.fecha,
+          titulo: item.titulo,
+          descripcion: item.descripcion || '',
+          nombreArchivo: item.nombre_archivo,
+          urlPdf: item.url_storage,
+          pesoBytes: Number(item.peso_bytes || 0),
+          pesoFormateado: item.peso_formateado || '100 KB',
+          subidoPor: item.nombre_responsable || 'Administrador',
+          subidoPorRol: 'Administrador',
+          fechaSubida: item.created_at || new Date().toISOString(),
+          estado: item.estado || 'aprobado',
+        }));
+      }
+    }
+  } catch (_) {}
+
+  // 2. Respaldo directo en cliente Supabase
   if (!isSupabaseConfigured() || !supabase) return [];
 
   try {
