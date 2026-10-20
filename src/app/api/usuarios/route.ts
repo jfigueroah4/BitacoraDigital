@@ -283,9 +283,6 @@ export async function PUT(req: NextRequest) {
         if (estado !== undefined) perfilUpdate.estado = estado;
         if (emailClean) perfilUpdate.correo = emailClean;
 
-        const nombreComp = `${primer_nombre || ''} ${primer_apellido || ''}`.trim();
-        if (nombreComp) perfilUpdate.nombre_completo = nombreComp;
-
         await supabaseAdmin.from('perfil_usuario').update(perfilUpdate).or(`usuario_id.eq.${id},correo.eq.${emailClean}`);
       } catch (errDb) {
         console.warn('[API /usuarios PUT] Error DB update:', errDb);

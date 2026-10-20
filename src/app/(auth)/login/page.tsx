@@ -132,16 +132,26 @@ export default function LoginPage() {
         admin: { email: 'admin@bitacoradigital.com', nombre: 'Daniel Figueroa', rol: 'Administrador', cargo: 'Administrador de Proyecto' },
         dfigueroa: { email: 'admin@bitacoradigital.com', nombre: 'Daniel Figueroa', rol: 'Administrador', cargo: 'Administrador de Proyecto' },
         danielfigueroa: { email: 'admin@bitacoradigital.com', nombre: 'Daniel Figueroa', rol: 'Administrador', cargo: 'Administrador de Proyecto' },
+        'admin@bitacoradigital.com': { email: 'admin@bitacoradigital.com', nombre: 'Daniel Figueroa', rol: 'Administrador', cargo: 'Administrador de Proyecto' },
         jfigueroa: { email: 'jafm911@gmail.com', nombre: 'Jorge Figueroa', rol: 'Administrador', cargo: 'Administrador de Proyecto' },
         jorgefigueroa: { email: 'jafm911@gmail.com', nombre: 'Jorge Figueroa', rol: 'Administrador', cargo: 'Administrador de Proyecto' },
+        'jafm911@gmail.com': { email: 'jafm911@gmail.com', nombre: 'Jorge Figueroa', rol: 'Administrador', cargo: 'Administrador de Proyecto' },
         adeleon: { email: 'adeleon@prodecsa.com.gt', nombre: 'Ing. Alejandra De León', rol: 'Usuario', cargo: 'Ingeniera de Proyecto (PRODECSA)' },
+        'adeleon@prodecsa.com.gt': { email: 'adeleon@prodecsa.com.gt', nombre: 'Ing. Alejandra De León', rol: 'Usuario', cargo: 'Ingeniera de Proyecto (PRODECSA)' },
         jzambrano: { email: 'ingenieria01zambrano@gipsa.gt', nombre: 'Ing. Jorge Zambrano', rol: 'Usuario', cargo: 'Ingeniero de Proyecto (GIPSA)' },
+        'ingenieria01zambrano@gipsa.gt': { email: 'ingenieria01zambrano@gipsa.gt', nombre: 'Ing. Jorge Zambrano', rol: 'Usuario', cargo: 'Ingeniero de Proyecto (GIPSA)' },
         slopez: { email: 'slopez@prodecsa.com.gt', nombre: 'Ing. Sharlyn López', rol: 'Usuario', cargo: 'Ingeniera de Proyecto (PRODECSA)' },
+        'slopez@prodecsa.com.gt': { email: 'slopez@prodecsa.com.gt', nombre: 'Ing. Sharlyn López', rol: 'Usuario', cargo: 'Ingeniera de Proyecto (PRODECSA)' },
         vbarrios: { email: 'jadquisiciones@gipsa.gt', nombre: 'Ing. Vinicio Barrios', rol: 'Usuario', cargo: 'Ingeniero de Adquisiciones (GIPSA)' },
+        'jadquisiciones@gipsa.gt': { email: 'jadquisiciones@gipsa.gt', nombre: 'Ing. Vinicio Barrios', rol: 'Usuario', cargo: 'Ingeniero de Adquisiciones (GIPSA)' },
         hfuentes: { email: 'hfuentes@domun.com.gt', nombre: 'Ing. Hugo Fuentes', rol: 'Usuario', cargo: 'Ingeniero de Proyecto (DOMUN)' },
+        'hfuentes@domun.com.gt': { email: 'hfuentes@domun.com.gt', nombre: 'Ing. Hugo Fuentes', rol: 'Usuario', cargo: 'Ingeniero de Proyecto (DOMUN)' },
         ralvarado: { email: 'tektonconsultores@yahoo.com', nombre: 'Ing. Raúl Alvarado', rol: 'Usuario', cargo: 'Ingeniero de Proyecto (DOMUN)' },
+        'tektonconsultores@yahoo.com': { email: 'tektonconsultores@yahoo.com', nombre: 'Ing. Raúl Alvarado', rol: 'Usuario', cargo: 'Ingeniero de Proyecto (DOMUN)' },
         jaldana: { email: 'jaldana@vasguatemala.com', nombre: 'Ing. José Aldana', rol: 'Usuario', cargo: 'Ingeniero de Proyecto (SACBE)' },
+        'jaldana@vasguatemala.com': { email: 'jaldana@vasguatemala.com', nombre: 'Ing. José Aldana', rol: 'Usuario', cargo: 'Ingeniero de Proyecto (SACBE)' },
         aguillermo: { email: 'aguillermo@vasguatemala.com', nombre: 'Ing. Álvaro Guillermo', rol: 'Usuario', cargo: 'Ingeniero de Proyecto (SACBE)' },
+        'aguillermo@vasguatemala.com': { email: 'aguillermo@vasguatemala.com', nombre: 'Ing. Álvaro Guillermo', rol: 'Usuario', cargo: 'Ingeniero de Proyecto (SACBE)' },
       };
 
       if (!emailParaAuth && usuariosBaseMap[cleanUser]) {
@@ -216,18 +226,28 @@ export default function LoginPage() {
               .eq('usuario_id', authRes.user.id)
               .maybeSingle();
 
-            const rolNombre = perfilData?.usuario?.rol?.nombre_rol || 'Usuario';
+            const userMeta = authRes.user.user_metadata || {};
+            const baseMatch = usuariosBaseMap[emailParaAuth.toLowerCase()] || usuariosBaseMap[cleanUser];
+            const rolNombre = userMeta.rol || perfilData?.usuario?.rol?.nombre_rol || baseMatch?.rol || 'Usuario';
+            
+            const rawNombre =
+              userMeta.nombre_completo ||
+              baseMatch?.nombre ||
+              perfilData?.nombre_completo ||
+              `${perfilData?.primer_nombre || ''} ${perfilData?.primer_apellido || ''}`.trim() ||
+              authRes.user.email ||
+              'Usuario';
+            const nombreLimpio = rawNombre.replace(/\s+/g, ' ').trim();
+
             authUser = {
               id: authRes.user.id,
-              nombre:
-                perfilData?.nombre_completo ||
-                `${perfilData?.primer_nombre || ''} ${perfilData?.primer_apellido || ''}`.trim() ||
-                authRes.user.email ||
-                'Usuario',
+              nombre: nombreLimpio,
               email: authRes.user.email || emailParaAuth,
               rol: rolNombre === 'Administrador' ? 'Administrador' : 'Usuario',
               cargo:
+                userMeta.cargo ||
                 perfilData?.cargo_puesto ||
+                baseMatch?.cargo ||
                 (rolNombre === 'Administrador' ? 'Administrador de Proyecto' : 'Supervisor de Campo'),
             };
           }

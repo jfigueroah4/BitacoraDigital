@@ -203,7 +203,32 @@ export default function TopBar({
       try {
         const stored = localStorage.getItem('bitacora_user_profile');
         if (stored) {
-          setCurrentUser(JSON.parse(stored));
+          const parsed = JSON.parse(stored);
+          setCurrentUser(parsed);
+
+          // Auto-sanear y sincronizar nombre oficial desde /api/usuarios
+          if (parsed && parsed.email) {
+            fetch(`/api/usuarios?t=${Date.now()}`, { cache: 'no-store' })
+              .then((res) => res.json())
+              .then((data) => {
+                if (data.success && Array.isArray(data.usuarios)) {
+                  const match = data.usuarios.find(
+                    (u: any) => u.correo?.toLowerCase() === parsed.email?.toLowerCase()
+                  );
+                  if (match && match.nombre && (match.nombre !== parsed.nombre || match.rol !== parsed.rol)) {
+                    const actualizado = {
+                      ...parsed,
+                      nombre: match.nombre,
+                      rol: match.rol || parsed.rol,
+                      cargo: match.cargo || parsed.cargo,
+                    };
+                    localStorage.setItem('bitacora_user_profile', JSON.stringify(actualizado));
+                    setCurrentUser(actualizado);
+                  }
+                }
+              })
+              .catch(() => {});
+          }
         }
       } catch (_) {}
     }
@@ -329,12 +354,14 @@ export default function TopBar({
   const getInitials = (nombre?: string) => {
     if (!nombre) return 'DF';
     const clean = nombre.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, '').trim();
-    const parts = clean.split(/\s+/).filter(Boolean);
-    if (parts.length >= 2) {
-      return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+    const rawParts = clean.split(/\s+/).filter(Boolean);
+    const parts = rawParts.filter((p) => !['ing', 'arq', 'lic', 'dr', 'dra'].includes(p.toLowerCase()));
+    const finalParts = parts.length > 0 ? parts : rawParts;
+    if (finalParts.length >= 2) {
+      return `${finalParts[0][0]}${finalParts[1][0]}`.toUpperCase();
     }
-    if (parts.length === 1 && parts[0].length >= 2) {
-      return parts[0].substring(0, 2).toUpperCase();
+    if (finalParts.length === 1 && finalParts[0].length >= 2) {
+      return finalParts[0].substring(0, 2).toUpperCase();
     }
     return (clean[0] || 'U').toUpperCase();
   };

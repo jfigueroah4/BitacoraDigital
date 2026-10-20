@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
@@ -95,41 +95,24 @@ const ROLES_BASE: RolItem[] = [
     color: '#3B2219',
     estado: 'Activo',
     nivelJerarquico: 'Alta Gerencia',
-    permisos: ['*.*', 'bitacora.ver', 'bitacora.crear', 'bitacora.subir_pdf', 'bitacora.aprobar', 'usuarios.ver', 'usuarios.crear', 'usuarios.editar', 'usuarios.eliminar', 'roles.gestionar', 'reportes.ver', 'reportes.exportar', 'tickets.ver', 'tickets.responder', 'tickets.despachar_claves'],
-    usuariosAsignados: ['admin@bitacoradigital.com'],
-  },
-  {
-    id: 'rol-gerencia',
-    name: 'Gerencia',
-    email: 'gerencia@bitacoradigital.com',
-    descripcion: 'Supervisión ejecutiva, auditoría de bitácoras de obra y aprobación de reportes.',
-    color: '#1E40AF',
-    estado: 'Activo',
-    nivelJerarquico: 'Alta Gerencia',
-    permisos: ['bitacora.ver', 'bitacora.aprobar', 'reportes.ver', 'reportes.exportar', 'usuarios.ver', 'tickets.ver'],
-    usuariosAsignados: [],
-  },
-  {
-    id: 'rol-residente',
-    name: 'Ingeniero Residente',
-    email: 'residente@bitacoradigital.com',
-    descripcion: 'Control técnico de obra en campo, subida de evidencias diarias y folios PDF.',
-    color: '#047857',
-    estado: 'Activo',
-    nivelJerarquico: 'Mando Medio',
-    permisos: ['bitacora.ver', 'bitacora.crear', 'bitacora.subir_pdf', 'reportes.ver', 'reportes.exportar'],
-    usuariosAsignados: [],
-  },
-  {
-    id: 'rol-laboratorio',
-    name: 'Laboratorista',
-    email: 'laboratorio@bitacoradigital.com',
-    descripcion: 'Registro de ensayos de densidades, rotura de cilindros y control de materiales.',
-    color: '#B45309',
-    estado: 'Activo',
-    nivelJerarquico: 'Operativo',
-    permisos: ['bitacora.ver', 'bitacora.crear'],
-    usuariosAsignados: [],
+    permisos: [
+      '*.*',
+      'bitacora.ver',
+      'bitacora.crear',
+      'bitacora.subir_pdf',
+      'bitacora.aprobar',
+      'usuarios.ver',
+      'usuarios.crear',
+      'usuarios.editar',
+      'usuarios.eliminar',
+      'roles.gestionar',
+      'reportes.ver',
+      'reportes.exportar',
+      'tickets.ver',
+      'tickets.responder',
+      'tickets.despachar_claves',
+    ],
+    usuariosAsignados: ['admin@bitacoradigital.com', 'jafm911@gmail.com'],
   },
   {
     id: 'rol-usuario',
@@ -140,7 +123,16 @@ const ROLES_BASE: RolItem[] = [
     estado: 'Activo',
     nivelJerarquico: 'Operativo',
     permisos: ['bitacora.ver'],
-    usuariosAsignados: [],
+    usuariosAsignados: [
+      'adeleon@prodecsa.com.gt',
+      'ingenieria01zambrano@gipsa.gt',
+      'slopez@prodecsa.com.gt',
+      'jadquisiciones@gipsa.gt',
+      'hfuentes@domun.com.gt',
+      'tektonconsultores@yahoo.com',
+      'jaldana@vasguatemala.com',
+      'aguillermo@vasguatemala.com',
+    ],
   },
 ];
 
@@ -173,6 +165,40 @@ export default function RolesPage() {
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [rolEliminar, setRolEliminar] = useState<RolItem | null>(null);
 
+  // Función para obtener usuarios de un rol de forma dinámica y exacta
+  const getUsuariosDeRol = useCallback(
+    (rol: RolItem) => {
+      const rolNameClean = rol.name.toLowerCase().trim();
+      return usuariosSistema.filter((u: any) => {
+        const userRol = (u.rol || '').toLowerCase().trim();
+        const coincideNombreRol = userRol === rolNameClean;
+        const coincideAsignado = (rol.usuariosAsignados || []).some(
+          (ref) =>
+            ref.toLowerCase() === (u.correo || '').toLowerCase() ||
+            ref.toLowerCase() === (u.username || '').toLowerCase() ||
+            ref === u.id
+        );
+        return coincideNombreRol || coincideAsignado;
+      });
+    },
+    [usuariosSistema]
+  );
+
+  const fetchUsuarios = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/usuarios?t=${Date.now()}`, { cache: 'no-store' });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && Array.isArray(data.usuarios)) {
+          setUsuariosSistema(data.usuarios);
+          try {
+            localStorage.setItem('bitacora_usuarios_lista', JSON.stringify(data.usuarios));
+          } catch (_) {}
+        }
+      }
+    } catch (_) {}
+  }, []);
+
   useEffect(() => {
     try {
       const storedProfile = localStorage.getItem('bitacora_user_profile');
@@ -192,10 +218,27 @@ export default function RolesPage() {
       if (storedRoles) {
         const parsed = JSON.parse(storedRoles);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          setRoles(parsed);
+          const merged = parsed.map((r: RolItem) => {
+            const base = ROLES_BASE.find((b) => b.name.toLowerCase() === r.name.toLowerCase());
+            if (base) {
+              return {
+                ...r,
+                descripcion: r.descripcion || base.descripcion,
+                permisos: r.permisos && r.permisos.length > 0 ? r.permisos : base.permisos,
+              };
+            }
+            return r;
+          });
+          setRoles(merged);
+        } else {
+          setRoles(ROLES_BASE);
         }
+      } else {
+        setRoles(ROLES_BASE);
       }
-    } catch (_) {}
+    } catch (_) {
+      setRoles(ROLES_BASE);
+    }
 
     try {
       const storedUsers = localStorage.getItem('bitacora_usuarios_lista');
@@ -203,11 +246,15 @@ export default function RolesPage() {
         const parsed = JSON.parse(storedUsers);
         if (Array.isArray(parsed) && parsed.length > 0) {
           setUsuariosSistema(parsed);
-          return;
         }
       }
     } catch (_) {}
-  }, []);
+
+    // Cargar usuarios en vivo desde API
+    fetchUsuarios();
+    const interval = setInterval(fetchUsuarios, 8000);
+    return () => clearInterval(interval);
+  }, [router, fetchUsuarios]);
 
   const saveRoles = (nuevos: RolItem[]) => {
     setRoles(nuevos);
@@ -226,7 +273,10 @@ export default function RolesPage() {
       setFormEstado(rol.estado);
       setFormNivel(rol.nivelJerarquico || 'Operativo');
       setFormPermisos(rol.permisos || []);
-      setFormUsuariosAsignados(rol.usuariosAsignados || []);
+
+      // Si es asignación de usuarios o ver detalle, preseleccionar todos los usuarios que pertenecen a este rol
+      const usersActuales = getUsuariosDeRol(rol);
+      setFormUsuariosAsignados(usersActuales.map((u) => u.correo));
     } else {
       setRolActivo(null);
       setFormName('');
@@ -262,15 +312,89 @@ export default function RolesPage() {
   };
 
   const handleToggleUsuarioAsignado = (correoOUsuario: string) => {
+    // Proteger al administrador principal Daniel Figueroa
+    if (
+      rolActivo?.name === 'Administrador' &&
+      correoOUsuario.toLowerCase() === 'admin@bitacoradigital.com'
+    ) {
+      showErrorToast('El Administrador principal (Daniel Figueroa) no puede ser desasignado.');
+      return;
+    }
+
     setFormUsuariosAsignados((prev) =>
       prev.includes(correoOUsuario)
-        ? prev.filter((u) => u !== correoOUsuario)
+        ? prev.filter((u) => u.toLowerCase() !== correoOUsuario.toLowerCase())
         : [...prev, correoOUsuario]
     );
   };
 
-  const handleSaveRol = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSaveRol = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+
+    if (drawerMode === 'users' && rolActivo) {
+      const nuevoRolNombre = rolActivo.name;
+
+      // Actualizar roles de usuarios afectados en backend y en memoria
+      const usuariosActualizados = usuariosSistema.map((u) => {
+        const estaAsignado = formUsuariosAsignados.some(
+          (c) => c.toLowerCase() === u.correo?.toLowerCase()
+        );
+        if (estaAsignado) {
+          // Asignar este rol si no lo tenía
+          if (u.rol !== nuevoRolNombre) {
+            fetch('/api/usuarios', {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                id: u.id,
+                correo: u.correo,
+                rol: nuevoRolNombre,
+              }),
+            }).catch(() => {});
+            return { ...u, rol: nuevoRolNombre };
+          }
+        } else {
+          // Si estaba en este rol y se desasignó, cambiar a 'Usuario' (a menos que sea admin@bitacoradigital.com)
+          if (
+            u.rol === nuevoRolNombre &&
+            u.correo?.toLowerCase() !== 'admin@bitacoradigital.com'
+          ) {
+            const rolFallback = nuevoRolNombre === 'Administrador' ? 'Usuario' : u.rol;
+            fetch('/api/usuarios', {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                id: u.id,
+                correo: u.correo,
+                rol: rolFallback,
+              }),
+            }).catch(() => {});
+            return { ...u, rol: rolFallback };
+          }
+        }
+        return u;
+      });
+
+      setUsuariosSistema(usuariosActualizados);
+      try {
+        localStorage.setItem('bitacora_usuarios_lista', JSON.stringify(usuariosActualizados));
+      } catch (_) {}
+
+      const actualizados = roles.map((r) => {
+        if (r.id === rolActivo.id) {
+          return {
+            ...r,
+            usuariosAsignados: formUsuariosAsignados,
+          };
+        }
+        return r;
+      });
+      saveRoles(actualizados);
+      showSuccessToast(`Usuarios asignados correctamente al rol ${rolActivo.name}`);
+      cerrarDrawer();
+      return;
+    }
+
     if (!formName.trim()) {
       showErrorToast('Por favor ingresa un nombre para el rol.');
       return;
@@ -294,18 +418,6 @@ export default function RolesPage() {
       });
       saveRoles(actualizados);
       showSuccessToast('Rol actualizado exitosamente');
-    } else if (drawerMode === 'users' && rolActivo) {
-      const actualizados = roles.map((r) => {
-        if (r.id === rolActivo.id) {
-          return {
-            ...r,
-            usuariosAsignados: formUsuariosAsignados,
-          };
-        }
-        return r;
-      });
-      saveRoles(actualizados);
-      showSuccessToast('Usuarios asignados correctamente al rol');
     } else {
       const nuevo: RolItem = {
         id: `rol-${Date.now()}`,
@@ -327,8 +439,8 @@ export default function RolesPage() {
 
   const handleConfirmDelete = () => {
     if (!rolEliminar) return;
-    if (rolEliminar.name === 'Administrador') {
-      showErrorToast('No se puede eliminar el rol de Administrador.');
+    if (rolEliminar.name === 'Administrador' || rolEliminar.name === 'Usuario') {
+      showErrorToast(`No se puede eliminar el rol de ${rolEliminar.name} del sistema.`);
       setDeleteModalOpen(false);
       return;
     }
@@ -359,6 +471,20 @@ export default function RolesPage() {
     const inicio = (paginaActual - 1) * registrosPorPagina;
     return rolesFiltrados.slice(inicio, inicio + registrosPorPagina);
   }, [rolesFiltrados, paginaActual, registrosPorPagina]);
+
+  const getInitials = (nombre?: string) => {
+    if (!nombre) return 'US';
+    const clean = nombre.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, '').trim();
+    const rawParts = clean.split(/\s+/).filter(Boolean);
+    const parts = rawParts.filter(
+      (p) => !['ing', 'arq', 'lic', 'dr', 'dra'].includes(p.toLowerCase())
+    );
+    const finalParts = parts.length > 0 ? parts : rawParts;
+    if (finalParts.length >= 2) {
+      return `${finalParts[0][0]}${finalParts[1][0]}`.toUpperCase();
+    }
+    return (clean[0] || 'U').toUpperCase();
+  };
 
   return (
     <div className="min-h-screen bg-[#F3F4F7] text-[#07152B] flex flex-col font-poppins selection:bg-[#3B2219] selection:text-white">
@@ -453,6 +579,7 @@ export default function RolesPage() {
         <div className="md:hidden space-y-3">
           {rolesPaginados.map((rol) => {
             const isFullAdmin = rol.name === 'Administrador' || rol.permisos.includes('*.*');
+            const usuariosRol = getUsuariosDeRol(rol);
             return (
               <div
                 key={`mob-${rol.id}`}
@@ -491,7 +618,7 @@ export default function RolesPage() {
                     className="inline-flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-2.5 py-1 text-[10px] font-semibold text-gray-700 cursor-pointer shadow-2xs hover:bg-gray-50"
                   >
                     <Users size={12} className="text-[#3B2219]" />
-                    <span>{rol.usuariosAsignados.length} usuarios</span>
+                    <span>{usuariosRol.length} usuarios</span>
                   </button>
 
                   {isFullAdmin ? (
@@ -530,7 +657,7 @@ export default function RolesPage() {
                   >
                     <UserPlus size={14} />
                   </button>
-                  {rol.name !== 'Administrador' && (
+                  {rol.name !== 'Administrador' && rol.name !== 'Usuario' && (
                     <button
                       type="button"
                       onClick={() => {
@@ -567,6 +694,7 @@ export default function RolesPage() {
                 {rolesPaginados.map((rol) => {
                   const isFullAdmin =
                     rol.name === 'Administrador' || rol.permisos.includes('*.*');
+                  const usuariosRol = getUsuariosDeRol(rol);
                   return (
                     <tr
                       key={rol.id}
@@ -610,7 +738,7 @@ export default function RolesPage() {
                           title="Ver y asignar usuarios a este rol"
                         >
                           <Users size={12} className="text-[#3B2219]" />
-                          <span>{rol.usuariosAsignados.length} usuarios</span>
+                          <span>{usuariosRol.length} usuarios</span>
                         </button>
                       </td>
                       <td className="px-4 py-3.5">
@@ -652,7 +780,7 @@ export default function RolesPage() {
                           >
                             <UserPlus size={14} />
                           </button>
-                          {rol.name !== 'Administrador' && (
+                          {rol.name !== 'Administrador' && rol.name !== 'Usuario' && (
                             <button
                               type="button"
                               onClick={() => {
@@ -703,7 +831,7 @@ export default function RolesPage() {
         )}
       </main>
 
-      {/* RoleDrawer Slide-over (Idéntico a DomunNet) */}
+      {/* RoleDrawer Slide-over */}
       {drawerOpen && (
         <>
           <div
@@ -753,38 +881,67 @@ export default function RolesPage() {
                 <div className="space-y-3">
                   <div className="flex items-center justify-between pb-2 border-b border-gray-100">
                     <span className="text-xs font-bold text-gray-700">Usuarios del Sistema</span>
-                    <span className="text-[11px] text-[#3B2219] font-semibold">
+                    <span className="text-[11px] text-[#3B2219] font-bold">
                       {formUsuariosAsignados.length} asignados
                     </span>
                   </div>
 
                   <div className="space-y-2">
                     {usuariosSistema.map((user) => {
-                      const isAssigned = formUsuariosAsignados.includes(user.correo);
+                      const isAssigned = formUsuariosAsignados.some(
+                        (c) => c.toLowerCase() === user.correo?.toLowerCase()
+                      );
+                      const isProtectedAdmin =
+                        rolActivo?.name === 'Administrador' &&
+                        user.correo?.toLowerCase() === 'admin@bitacoradigital.com';
+                      const nombreMostrar =
+                        user.nombre ||
+                        `${user.primer_nombre || ''} ${user.primer_apellido || ''}`.trim() ||
+                        'Usuario';
+                      const iniciales = getInitials(nombreMostrar);
+
                       return (
                         <div
                           key={user.id}
-                          onClick={() => handleToggleUsuarioAsignado(user.correo)}
-                          className={`flex items-center justify-between p-3 rounded-xl border transition-all cursor-pointer ${
+                          onClick={() => {
+                            if (!isProtectedAdmin) {
+                              handleToggleUsuarioAsignado(user.correo);
+                            }
+                          }}
+                          className={`flex items-center justify-between p-3 rounded-xl border transition-all ${
+                            isProtectedAdmin ? 'opacity-85 cursor-not-allowed bg-amber-50/40' : 'cursor-pointer'
+                          } ${
                             isAssigned
                               ? 'border-[#3B2219]/30 bg-[#F4ECE6]/40'
                               : 'border-gray-200 hover:bg-gray-50'
                           }`}
                         >
-                          <div className="flex items-center gap-2.5">
-                            <div className="w-8 h-8 rounded-full bg-gray-200 text-gray-700 flex items-center justify-center font-bold text-xs">
-                              {(user.primer_nombre?.[0] || 'U') + (user.primer_apellido?.[0] || '')}
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div className="w-8 h-8 rounded-full bg-[#3B2219] text-white flex items-center justify-center font-bold text-xs shrink-0 select-none shadow-2xs">
+                              {iniciales}
                             </div>
-                            <div>
-                              <p className="text-xs font-bold text-gray-800 leading-tight">
-                                {user.nombre || `${user.primer_nombre} ${user.primer_apellido}`}
-                              </p>
-                              <p className="text-[10px] text-gray-500">{user.correo}</p>
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <p className="text-xs font-bold text-gray-800 leading-tight truncate">
+                                  {nombreMostrar}
+                                </p>
+                                {user.username && (
+                                  <span className="text-[9px] px-1 py-0.2 bg-gray-100 text-gray-600 rounded font-mono font-semibold">
+                                    @{user.username}
+                                  </span>
+                                )}
+                                {isProtectedAdmin && (
+                                  <span className="text-[9px] px-1.5 py-0.2 bg-amber-100 text-amber-800 rounded font-semibold">
+                                    Admin Principal
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-[10px] text-gray-500 truncate">{user.correo}</p>
                             </div>
                           </div>
 
                           <div
-                            className={`w-5 h-5 rounded-md flex items-center justify-center border transition-all ${
+                            className={`w-5 h-5 rounded-md flex items-center justify-center border transition-all shrink-0 ml-2 ${
                               isAssigned
                                 ? 'bg-[#3B2219] border-[#3B2219] text-white'
                                 : 'border-gray-300 bg-white'
@@ -906,7 +1063,8 @@ export default function RolesPage() {
                           </h4>
                           <div className="space-y-1">
                             {cat.items.map((perm) => {
-                              const isChecked = formPermisos.includes(perm.id) || formPermisos.includes('*.*');
+                              const isChecked =
+                                formPermisos.includes(perm.id) || formPermisos.includes('*.*');
                               return (
                                 <div
                                   key={perm.id}
@@ -953,7 +1111,7 @@ export default function RolesPage() {
                 <button
                   type={drawerMode === 'users' ? 'button' : 'submit'}
                   form={drawerMode === 'users' ? undefined : 'role-drawer-form'}
-                  onClick={drawerMode === 'users' ? handleSaveRol : undefined}
+                  onClick={drawerMode === 'users' ? () => handleSaveRol() : undefined}
                   className="px-5 py-2 rounded-xl bg-[#3B2219] hover:bg-[#2A1710] text-white text-xs font-bold transition-all shadow-sm active:scale-95 cursor-pointer"
                 >
                   {drawerMode === 'users' ? 'Guardar Asignaciones' : 'Guardar Rol'}
@@ -999,4 +1157,3 @@ export default function RolesPage() {
     </div>
   );
 }
-
