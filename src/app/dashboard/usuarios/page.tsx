@@ -14,6 +14,7 @@ import { supabase } from '@/lib/supabase/client';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { showSuccessToast, showErrorToast } from '@/components/ui/Toast';
 import { formatearNombrePropio } from '@/lib/utils/formatters';
+import { obtenerSesionesUsuario, limpiarSesionesUsuario } from '@/lib/services/sesiones';
 
 const USUARIOS_BASE: Usuario[] = [
   {
@@ -81,11 +82,23 @@ export default function UsuariosPage() {
   const [currentUserEmail, setCurrentUserEmail] = useState('');
   const [isAdmin, setIsAdmin] = useState(false);
 
-  // Filtros
+  // Filtros y Búsqueda en vivo
   const [busqueda, setBusqueda] = useState('');
-  const [debouncedBusqueda, setDebouncedBusqueda] = useState('');
   const [filtroEstado, setFiltroEstado] = useState<EstadoUsuario | 'Todos'>('Todos');
   const [filtroRol, setFiltroRol] = useState<string>('Todos');
+
+  // Ordenamiento global de columnas
+  const [sortColumn, setSortColumn] = useState<string>('nombre');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+
+  const handleSort = (column: string) => {
+    if (sortColumn === column) {
+      setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortColumn(column);
+      setSortDirection('asc');
+    }
+  };
 
   // Paginación
   const [paginaActual, setPaginaActual] = useState(1);
@@ -110,7 +123,7 @@ export default function UsuariosPage() {
     try {
       setLoading(true);
 
-      // 1. Obtener usuarios locales existentes en localStorage
+      // 1. Obtener usuarios locales existentes en localStorage (creados por el administrador)
       let usuariosLocales: Usuario[] = [];
       try {
         const stored = localStorage.getItem('bitacora_usuarios_lista');
@@ -139,7 +152,7 @@ export default function UsuariosPage() {
                 id: item.usuario_id || item.id,
                 primer_nombre: pNombre,
                 primer_apellido: pApellido,
-                username: item.username || item.usuario?.username || `${pNombre[0] || ''}${pApellido || ''}`.toLowerCase().replace(/[^a-z0-9]/g, ''),
+                username: item.username || item.usuario?.username || `${pNombre[0] || ''}${pApellido || ''}`.toLowerCase().replace(/[^a-z0-9._]/g, ''),
                 nombre: item.nombre_completo || `${pNombre} ${pApellido}`.trim(),
                 correo: item.usuario?.correo || item.correo || 'usuario@bitacoradigital.com',
                 rol: item.usuario?.rol?.nombre_rol || item.rol || 'Usuario',
@@ -154,34 +167,41 @@ export default function UsuariosPage() {
         } catch (_) {}
       }
 
-      // 3. Fusión sin pérdida: 
-      // Prioridad: Datos DB -> Usuarios locales (creados en cliente) -> Usuarios base demo
+      // 3. Fusión con prioridad absoluta a usuarios locales para conservar roles (ej. Administrador),
+      // nombres reales, números telefónicos y datos sin que sean sobreescritos por datos genéricos de DB
       const emailsVistos = new Set<string>();
+      const usernamesVistos = new Set<string>();
       const combinados: Usuario[] = [];
 
-      // A) Usuarios de DB
-      mapeados.forEach((u) => {
-        const key = u.correo.toLowerCase();
-        if (!emailsVistos.has(key)) {
-          emailsVistos.add(key);
-          combinados.push(u);
-        }
-      });
-
-      // B) Usuarios locales (para que NUNCA desaparezcan al recargar la página o el servidor)
+      // A) Usuarios locales guardados por el admin (PRIORIDAD MÁXIMA)
       usuariosLocales.forEach((u) => {
-        const key = u.correo.toLowerCase();
-        if (!emailsVistos.has(key)) {
-          emailsVistos.add(key);
+        const emailKey = u.correo?.trim().toLowerCase();
+        const userKey = u.username?.trim().toLowerCase();
+        if (emailKey && !emailsVistos.has(emailKey) && (!userKey || !usernamesVistos.has(userKey))) {
+          emailsVistos.add(emailKey);
+          if (userKey) usernamesVistos.add(userKey);
           combinados.push(u);
         }
       });
 
-      // C) Usuarios base demo que no estén ya en la lista
+      // B) Usuarios remotos de DB que no estén ya registrados localmente
+      mapeados.forEach((u) => {
+        const emailKey = u.correo?.trim().toLowerCase();
+        const userKey = u.username?.trim().toLowerCase();
+        if (emailKey && !emailsVistos.has(emailKey) && (!userKey || !usernamesVistos.has(userKey))) {
+          emailsVistos.add(emailKey);
+          if (userKey) usernamesVistos.add(userKey);
+          combinados.push(u);
+        }
+      });
+
+      // C) Usuarios base demo que no existan aún
       USUARIOS_BASE.forEach((u) => {
-        const key = u.correo.toLowerCase();
-        if (!emailsVistos.has(key)) {
-          emailsVistos.add(key);
+        const emailKey = u.correo?.trim().toLowerCase();
+        const userKey = u.username?.trim().toLowerCase();
+        if (emailKey && !emailsVistos.has(emailKey) && (!userKey || !usernamesVistos.has(userKey))) {
+          emailsVistos.add(emailKey);
+          if (userKey) usernamesVistos.add(userKey);
           combinados.push(u);
         }
       });
@@ -189,7 +209,6 @@ export default function UsuariosPage() {
       setUsuarios(combinados);
       localStorage.setItem('bitacora_usuarios_lista', JSON.stringify(combinados));
     } catch (_) {
-      // Fallback si ocurre alguna excepción no controlada
       const stored = localStorage.getItem('bitacora_usuarios_lista');
       if (stored) {
         try {
@@ -226,45 +245,90 @@ export default function UsuariosPage() {
     cargarUsuarios();
   }, [cargarUsuarios]);
 
-  useEffect(() => {
-    const handler = setTimeout(() => {
-      setDebouncedBusqueda(busqueda);
-    }, 250);
-    return () => clearTimeout(handler);
-  }, [busqueda]);
-
-  // Filtrado
+  // Filtrado en vivo (sin esperas de debouncing ni necesidad de dar enter)
   const usuariosFiltrados = useMemo(() => {
+    const q = busqueda.toLowerCase().trim();
     return usuarios.filter((u) => {
-      const q = debouncedBusqueda.toLowerCase().trim();
       const matchBusqueda =
         !q ||
-        u.nombre.toLowerCase().includes(q) ||
-        u.correo.toLowerCase().includes(q) ||
-        (u.cargo && u.cargo.toLowerCase().includes(q));
+        (u.nombre && u.nombre.toLowerCase().includes(q)) ||
+        (u.correo && u.correo.toLowerCase().includes(q)) ||
+        (u.username && u.username.toLowerCase().includes(q)) ||
+        (u.telefono && u.telefono.toLowerCase().includes(q));
 
-      const matchEstado =
-        filtroEstado === 'Todos' ||
-        u.estado === filtroEstado ||
-        (filtroEstado === 'Inactivo' && (u.estado === 'Inactivo' || (u as any).activo === false)) ||
-        (filtroEstado === 'Suspendido' && u.estado === 'Suspendido');
+      const esSuspendido = u.estado === 'Suspendido' || (u as any).activo === false;
+      const tieneSesion = !esSuspendido && obtenerSesionesUsuario(u.correo).length > 0;
+
+      let matchEstado = true;
+      if (filtroEstado === 'Suspendido') {
+        matchEstado = esSuspendido;
+      } else if (filtroEstado === 'Activo') {
+        matchEstado = tieneSesion;
+      } else if (filtroEstado === 'Inactivo') {
+        matchEstado = !esSuspendido && !tieneSesion;
+      }
 
       const matchRol = filtroRol === 'Todos' || u.rol === filtroRol;
 
       return matchBusqueda && matchEstado && matchRol;
     });
-  }, [usuarios, debouncedBusqueda, filtroEstado, filtroRol]);
+  }, [usuarios, busqueda, filtroEstado, filtroRol]);
 
-  const totalPaginas = Math.ceil(usuariosFiltrados.length / registrosPorPagina) || 1;
+  // Ordenamiento global de todo el conjunto de datos filtrado
+  const usuariosOrdenados = useMemo(() => {
+    if (!sortColumn) return usuariosFiltrados;
+
+    const sorted = [...usuariosFiltrados].sort((a, b) => {
+      let aVal = '';
+      let bVal = '';
+
+      switch (sortColumn) {
+        case 'nombre':
+          aVal = (a.nombre || `${a.primer_nombre} ${a.primer_apellido}`).toLowerCase();
+          bVal = (b.nombre || `${b.primer_nombre} ${b.primer_apellido}`).toLowerCase();
+          break;
+        case 'correo':
+          aVal = (a.correo || '').toLowerCase();
+          bVal = (b.correo || '').toLowerCase();
+          break;
+        case 'rol':
+          aVal = (a.rol || '').toLowerCase();
+          bVal = (b.rol || '').toLowerCase();
+          break;
+        case 'estado': {
+          const aSusp = a.estado === 'Suspendido' || (a as any).activo === false;
+          const bSusp = b.estado === 'Suspendido' || (b as any).activo === false;
+          const aSes = obtenerSesionesUsuario(a.correo).length > 0;
+          const bSes = obtenerSesionesUsuario(b.correo).length > 0;
+          aVal = aSusp ? '3_suspendido' : (aSes ? '1_activo' : '2_inactivo');
+          bVal = bSusp ? '3_suspendido' : (bSes ? '1_activo' : '2_inactivo');
+          break;
+        }
+        case 'ultimoAcceso':
+          aVal = (a.ultimoAcceso || '').toLowerCase();
+          bVal = (b.ultimoAcceso || '').toLowerCase();
+          break;
+        default:
+          return 0;
+      }
+
+      const cmp = aVal.localeCompare(bVal, 'es', { sensitivity: 'base' });
+      return sortDirection === 'asc' ? cmp : -cmp;
+    });
+
+    return sorted;
+  }, [usuariosFiltrados, sortColumn, sortDirection]);
+
+  const totalPaginas = Math.ceil(usuariosOrdenados.length / registrosPorPagina) || 1;
 
   const usuariosPaginados = useMemo(() => {
     const inicio = (paginaActual - 1) * registrosPorPagina;
-    return usuariosFiltrados.slice(inicio, inicio + registrosPorPagina);
-  }, [usuariosFiltrados, paginaActual, registrosPorPagina]);
+    return usuariosOrdenados.slice(inicio, inicio + registrosPorPagina);
+  }, [usuariosOrdenados, paginaActual, registrosPorPagina]);
 
   useEffect(() => {
     setPaginaActual(1);
-  }, [debouncedBusqueda, filtroEstado, filtroRol, registrosPorPagina]);
+  }, [busqueda, filtroEstado, filtroRol, registrosPorPagina]);
 
   // Manejo de Drawer
   const abrirDrawer = (mode: UsuarioDrawerMode, usuario?: Usuario) => {
@@ -285,6 +349,43 @@ export default function UsuariosPage() {
       const sApellido = payload.segundo_apellido ? formatearNombrePropio(payload.segundo_apellido) : '';
       const nombreCompleto = `${pNombre} ${sNombre} ${pApellido} ${sApellido}`.replace(/\s+/g, ' ').trim();
 
+      const finalEmail = payload.correo.trim().toLowerCase();
+      const finalUsername = (payload.username || `${pNombre[0] || ''}${pApellido || ''}`).toLowerCase().replace(/[^a-z0-9._]/g, '');
+      const finalTelefono = (payload.telefono || '').trim();
+      const telClean = finalTelefono.replace(/[^0-9]/g, '');
+      const finalRol = payload.rol || 'Usuario';
+
+      // 1. Validar unicidad estricta (correo, username, teléfono)
+      const dupEmail = usuarios.some((u) => {
+        if (drawerMode === 'edit' && usuarioActivo && u.id === usuarioActivo.id) return false;
+        return u.correo && u.correo.trim().toLowerCase() === finalEmail;
+      });
+      if (dupEmail) {
+        showErrorToast(`El correo "${finalEmail}" ya está registrado por otro usuario.`);
+        return;
+      }
+
+      const dupUser = usuarios.some((u) => {
+        if (drawerMode === 'edit' && usuarioActivo && u.id === usuarioActivo.id) return false;
+        return u.username && u.username.trim().toLowerCase() === finalUsername;
+      });
+      if (dupUser) {
+        showErrorToast(`El nombre de usuario "@${finalUsername}" ya se encuentra registrado.`);
+        return;
+      }
+
+      if (telClean && telClean.length >= 7) {
+        const dupTel = usuarios.some((u) => {
+          if (drawerMode === 'edit' && usuarioActivo && u.id === usuarioActivo.id) return false;
+          const uTelClean = (u.telefono || '').replace(/[^0-9]/g, '');
+          return uTelClean && uTelClean === telClean;
+        });
+        if (dupTel) {
+          showErrorToast(`El teléfono "${finalTelefono}" ya se encuentra registrado por otro usuario.`);
+          return;
+        }
+      }
+
       if (drawerMode === 'edit' && usuarioActivo) {
         // Actualizar existente
         const actualizados = usuarios.map((u) => {
@@ -295,13 +396,13 @@ export default function UsuariosPage() {
               segundo_nombre: sNombre || null,
               primer_apellido: pApellido,
               segundo_apellido: sApellido || null,
-              username: payload.username || u.username || null,
+              username: finalUsername,
               nombre: nombreCompleto,
-              correo: payload.correo,
-              telefono: payload.telefono,
-              rol: payload.rol,
-              estado: payload.estado,
-              cargo: payload.cargo,
+              correo: finalEmail,
+              telefono: finalTelefono,
+              rol: finalRol,
+              estado: payload.estado || u.estado,
+              cargo: payload.cargo || u.cargo,
               direccion: payload.direccion || null,
             };
           }
@@ -319,27 +420,32 @@ export default function UsuariosPage() {
               primer_nombre: pNombre,
               primer_apellido: pApellido,
               cargo_puesto: payload.cargo,
-              telefono: payload.telefono,
-              correo: payload.correo,
+              telefono: finalTelefono,
+              correo: finalEmail,
             }).eq('usuario_id', usuarioActivo.id);
           } catch (_) {}
         }
 
         showSuccessToast('Usuario actualizado exitosamente');
       } else {
-        // Crear nuevo
-        let newId = `user-${Date.now()}`;
+        // Crear nuevo con ID único garantizado
+        let newId = `usr-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
 
         // Intentar registrar mediante API backend con Service Role
         try {
           const res = await fetch('/api/usuarios', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload),
+            body: JSON.stringify({
+              ...payload,
+              username: finalUsername,
+              correo: finalEmail,
+              rol: finalRol,
+            }),
           });
           if (res.ok) {
             const data = await res.json();
-            if (data?.usuario?.id) {
+            if (data?.usuario?.id && !usuarios.some(u => u.id === data.usuario.id)) {
               newId = data.usuario.id;
             }
           }
@@ -353,23 +459,25 @@ export default function UsuariosPage() {
           segundo_nombre: sNombre || null,
           primer_apellido: pApellido,
           segundo_apellido: sApellido || null,
-          username: payload.username || `${pNombre[0] || ''}${pApellido || ''}`.toLowerCase().replace(/[^a-z0-9]/g, ''),
+          username: finalUsername,
           nombre: nombreCompleto,
-          correo: payload.correo,
-          telefono: payload.telefono,
-          rol: payload.rol,
+          correo: finalEmail,
+          telefono: finalTelefono,
+          rol: finalRol,
           estado: payload.estado || 'Activo',
           cargo: payload.cargo,
           direccion: payload.direccion || null,
           fechaCreacion: new Date().toISOString().slice(0, 10),
+          ultimoAcceso: 'Sin accesos todavía',
+          contadorAccesos: 0,
         };
 
         // Guardar sin duplicar
-        const sinDuplicados = usuarios.filter((u) => u.correo.toLowerCase() !== nuevoUserObj.correo.toLowerCase());
+        const sinDuplicados = usuarios.filter((u) => u.correo.toLowerCase() !== finalEmail && u.username?.toLowerCase() !== finalUsername);
         const actualizados = [nuevoUserObj, ...sinDuplicados];
         setUsuarios(actualizados);
         localStorage.setItem('bitacora_usuarios_lista', JSON.stringify(actualizados));
-        showSuccessToast('Usuario creado exitosamente');
+        showSuccessToast(finalRol === 'Administrador' ? 'Usuario Administrador creado exitosamente' : 'Usuario creado exitosamente');
       }
 
       setDrawerOpen(false);
@@ -392,29 +500,40 @@ export default function UsuariosPage() {
     if (!usuarioEliminar) return;
 
     if (accion === 'eliminar') {
+      limpiarSesionesUsuario(usuarioEliminar.correo);
       const actualizados = usuarios.filter((u) => u.id !== usuarioEliminar.id);
       setUsuarios(actualizados);
       localStorage.setItem('bitacora_usuarios_lista', JSON.stringify(actualizados));
       showSuccessToast('Usuario eliminado definitivamente');
-    } else {
-      const nuevoEstado: EstadoUsuario = accion === 'activar' ? 'Activo' : 'Inactivo';
+    } else if (accion === 'suspender') {
+      limpiarSesionesUsuario(usuarioEliminar.correo);
       const actualizados = usuarios.map((u) => {
         if (u.id === usuarioEliminar.id) {
           return {
             ...u,
-            estado: nuevoEstado,
-            activo: accion === 'activar',
+            estado: 'Suspendido' as EstadoUsuario,
+            activo: false,
           };
         }
         return u;
       });
       setUsuarios(actualizados);
       localStorage.setItem('bitacora_usuarios_lista', JSON.stringify(actualizados));
-      showSuccessToast(
-        accion === 'activar'
-          ? 'Usuario activado exitosamente'
-          : 'Usuario inactivado exitosamente'
-      );
+      showSuccessToast('Usuario suspendido exitosamente. No podrá acceder al sistema.');
+    } else {
+      const actualizados = usuarios.map((u) => {
+        if (u.id === usuarioEliminar.id) {
+          return {
+            ...u,
+            estado: 'Activo' as EstadoUsuario,
+            activo: true,
+          };
+        }
+        return u;
+      });
+      setUsuarios(actualizados);
+      localStorage.setItem('bitacora_usuarios_lista', JSON.stringify(actualizados));
+      showSuccessToast('Usuario reactivado exitosamente.');
     }
 
     setDeleteOpen(false);
@@ -428,7 +547,11 @@ export default function UsuariosPage() {
 
   return (
     <div className="min-h-screen bg-[#F3F4F7] text-[#07152B] flex flex-col font-poppins selection:bg-[#3B2219] selection:text-white">
-      <TopBar bitacoraNombre="Proyecto: Conexion VAS - Hincapie • USUARIOS" />
+      <TopBar 
+        bitacoraNombre="Proyecto: Conexion VAS - Hincapie • USUARIOS"
+        searchQuery={busqueda}
+        onSearchChange={(val) => setBusqueda(val)}
+      />
 
       <main className="flex-1 w-full max-w-7xl mx-auto p-4 sm:p-6 lg:p-8 space-y-4">
         {/* Sticky Encabezado con Botones como en DomunNet */}
@@ -540,6 +663,9 @@ export default function UsuariosPage() {
           onGestionarDispositivos={handleGestionarDispositivos}
           currentUserEmail={currentUserEmail}
           canManage={isAdmin}
+          sortColumn={sortColumn}
+          sortDirection={sortDirection}
+          onSort={handleSort}
         />
 
         {/* Paginación Inferior idéntica a DomunNet */}
@@ -607,6 +733,7 @@ export default function UsuariosPage() {
         usuario={usuarioActivo}
         mode={drawerMode}
         onSwitchToEdit={() => setDrawerMode('edit')}
+        usuariosExistentes={usuarios}
       />
 
       {/* Modal de Acción (Eliminar / Suspender / Activar) */}

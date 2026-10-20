@@ -23,6 +23,7 @@ export interface Usuario {
   estado: EstadoUsuario;
   fechaCreacion: string;
   ultimoAcceso?: string;
+  contadorAccesos?: number;
   telefono?: string;
   cargo?: string;
   fecha_nacimiento?: string | null;

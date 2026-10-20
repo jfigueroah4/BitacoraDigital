@@ -153,17 +153,28 @@ export async function obtenerReportesBitacora(): Promise<DocumentoBitacora[]> {
 }
 
 export async function eliminarDocumentoBitacora(id: string): Promise<boolean> {
+  let ok = false;
+
+  // 1. Llamar al endpoint backend que cuenta con permisos Service Role para saltar RLS y borrar de storage
+  try {
+    const res = await fetch(`/api/bitacora?id=${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+    });
+    if (res.ok) {
+      ok = true;
+    }
+  } catch (apiErr) {
+    console.warn('[eliminarDocumentoBitacora] Error invocando API /api/bitacora:', apiErr);
+  }
+
+  // 2. Respaldo directo en cliente
   if (isSupabaseConfigured() && supabase) {
     try {
-      const { error } = await supabase.from('reportes_bitacora').delete().eq('id', id);
-      if (error) {
-        console.warn('[Supabase DB] Error eliminando:', error.message);
-      }
-    } catch (err) {
-      console.warn('[Supabase DB] Excepción eliminando:', err);
-    }
+      await supabase.from('reportes_bitacora').delete().eq('id', id);
+    } catch (_) {}
   }
-  return true;
+
+  return ok;
 }
 
 export async function actualizarDocumentoBitacora(

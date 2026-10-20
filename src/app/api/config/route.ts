@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { DURACION_PROYECTO_DEFAULT, DuracionProyecto } from '@/lib/mockData';
+import { supabaseAdmin } from '@/lib/supabase/admin';
 
 export const runtime = 'edge';
+
+const SUPABASE_CONFIG_URL =
+  'https://nzfmpkprenezcuvshomd.supabase.co/storage/v1/object/public/Bitacora-documentos/config/duracion.json';
 
 // Fallback en memoria en la instancia Edge
 let duracionServidor: DuracionProyecto = DURACION_PROYECTO_DEFAULT;
@@ -9,7 +13,30 @@ let duracionServidor: DuracionProyecto = DURACION_PROYECTO_DEFAULT;
 export async function GET(req: NextRequest) {
   let actual = duracionServidor;
 
-  // Si la cookie del cliente contiene una duración configurada, priorizarla
+  // 1. Prioridad: Supabase Storage compartido para todos los usuarios y dispositivos
+  try {
+    const resSupabase = await fetch(`${SUPABASE_CONFIG_URL}?t=${Date.now()}`, {
+      cache: 'no-store',
+    });
+    if (resSupabase.ok) {
+      const data = await resSupabase.json();
+      if (
+        data &&
+        typeof data.mesInicio === 'number' &&
+        typeof data.anioInicio === 'number' &&
+        typeof data.mesFin === 'number' &&
+        typeof data.anioFin === 'number'
+      ) {
+        duracionServidor = data;
+        return NextResponse.json({
+          success: true,
+          duracion: data,
+        });
+      }
+    }
+  } catch (_) {}
+
+  // 2. Si falló la red a Supabase, intentar cookie del cliente
   const cookieVal = req.cookies.get('bitacora_duracion_proyecto')?.value;
   if (cookieVal) {
     try {
@@ -43,16 +70,36 @@ export async function POST(req: NextRequest) {
       typeof body.mesFin === 'number' &&
       typeof body.anioFin === 'number'
     ) {
-      duracionServidor = {
+      const nuevaDuracion: DuracionProyecto = {
         mesInicio: body.mesInicio,
         anioInicio: body.anioInicio,
         mesFin: body.mesFin,
         anioFin: body.anioFin,
       };
 
-      const res = NextResponse.json({ success: true, duracion: duracionServidor });
+      duracionServidor = nuevaDuracion;
+
+      // 1. Guardar en Supabase Storage para que se refleje inmediatamente en todos los clientes
+      if (supabaseAdmin) {
+        try {
+          const blob = new Blob([JSON.stringify(nuevaDuracion)], {
+            type: 'application/json',
+          });
+          await supabaseAdmin.storage
+            .from('Bitacora-documentos')
+            .upload('config/duracion.json', blob, {
+              upsert: true,
+              cacheControl: '0',
+              contentType: 'application/json',
+            });
+        } catch (storageErr) {
+          console.warn('[API Config POST] Error guardando en Supabase Storage:', storageErr);
+        }
+      }
+
+      const res = NextResponse.json({ success: true, duracion: nuevaDuracion });
       // Persistir en cookie a nivel de dominio por 5 años
-      res.cookies.set('bitacora_duracion_proyecto', encodeURIComponent(JSON.stringify(duracionServidor)), {
+      res.cookies.set('bitacora_duracion_proyecto', encodeURIComponent(JSON.stringify(nuevaDuracion)), {
         path: '/',
         maxAge: 60 * 60 * 24 * 365 * 5, // 5 años
         sameSite: 'lax',
@@ -64,3 +111,4 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });
   }
 }
+

@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { Trash2, X, CheckCircle, PowerOff, UserX } from 'lucide-react';
+import { Portal } from './Portal';
 
 export interface AccionEstadoModalProps {
   isOpen: boolean;
@@ -41,7 +42,7 @@ export function AccionEstadoModal({
     : titulo;
 
   return (
-    <>
+    <Portal>
       {/* Fondo oscuro correctamente superpuesto a toda la pantalla */}
       <div
         className="fixed inset-0 z-[9999] bg-black/60 backdrop-blur-xs transition-opacity animate-fadeIn"
@@ -158,7 +159,7 @@ export function AccionEstadoModal({
           </div>
         </div>
       </div>
-    </>
+    </Portal>
   );
 }
 

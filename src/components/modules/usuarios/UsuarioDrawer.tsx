@@ -35,6 +35,7 @@ interface UsuarioDrawerProps {
   usuario?: Usuario;
   mode: UsuarioDrawerMode;
   onSwitchToEdit?: () => void;
+  usuariosExistentes?: Usuario[];
 }
 
 const ROLES_LISTA: RolUsuario[] = ['Administrador', 'Usuario'];
@@ -65,6 +66,7 @@ export function UsuarioDrawer({
   usuario,
   mode,
   onSwitchToEdit,
+  usuariosExistentes = [],
 }: UsuarioDrawerProps) {
   const [primerNombre, setPrimerNombre] = useState('');
   const [segundoNombre, setSegundoNombre] = useState('');
@@ -171,6 +173,40 @@ export function UsuarioDrawer({
     return /^[a-z0-9._]{3,30}$/.test(val);
   }, [username]);
 
+  const isUsernameDuplicated = useMemo(() => {
+    const val = (username.trim() || (isUsernameAuto ? generarUsernameSugerido(primerNombre, primerApellido) : '')).toLowerCase();
+    if (!val || !usuariosExistentes || usuariosExistentes.length === 0) return false;
+    return usuariosExistentes.some((u) => {
+      if (usuario && (u.id === usuario.id || u.correo?.toLowerCase() === usuario.correo?.toLowerCase())) {
+        return false;
+      }
+      return u.username && u.username.trim().toLowerCase() === val;
+    });
+  }, [username, isUsernameAuto, primerNombre, primerApellido, usuariosExistentes, usuario]);
+
+  const isEmailDuplicated = useMemo(() => {
+    const val = correo.trim().toLowerCase();
+    if (!val || !usuariosExistentes || usuariosExistentes.length === 0) return false;
+    return usuariosExistentes.some((u) => {
+      if (usuario && (u.id === usuario.id || u.correo?.toLowerCase() === usuario.correo?.toLowerCase())) {
+        return false;
+      }
+      return u.correo && u.correo.trim().toLowerCase() === val;
+    });
+  }, [correo, usuariosExistentes, usuario]);
+
+  const isTelefonoDuplicated = useMemo(() => {
+    const telClean = telefono.replace(/[^0-9]/g, '');
+    if (!telClean || telClean.length < 7 || !usuariosExistentes || usuariosExistentes.length === 0) return false;
+    return usuariosExistentes.some((u) => {
+      if (usuario && (u.id === usuario.id || u.correo?.toLowerCase() === usuario.correo?.toLowerCase())) {
+        return false;
+      }
+      const uTel = (u.telefono || '').replace(/[^0-9]/g, '');
+      return uTel && uTel === telClean;
+    });
+  }, [telefono, usuariosExistentes, usuario]);
+
   const validCorreo = useMemo(() => {
     const val = correo.trim();
     if (!val) return false;
@@ -214,6 +250,9 @@ export function UsuarioDrawer({
       validPrimerApellido &&
       validCorreo &&
       validUsername &&
+      !isUsernameDuplicated &&
+      !isEmailDuplicated &&
+      !isTelefonoDuplicated &&
       validTelefono &&
       validPassword &&
       passwordsMatch
@@ -223,6 +262,9 @@ export function UsuarioDrawer({
     validPrimerApellido,
     validCorreo,
     validUsername,
+    isUsernameDuplicated,
+    isEmailDuplicated,
+    isTelefonoDuplicated,
     validTelefono,
     validPassword,
     passwordsMatch,
@@ -245,8 +287,21 @@ export function UsuarioDrawer({
       showErrorToast('Por favor ingresa un correo electrónico válido.');
       return;
     }
+    if (isEmailDuplicated) {
+      showErrorToast(`El correo electrónico "${correo.trim()}" ya está registrado por otro usuario.`);
+      return;
+    }
     if (username && !validUsername) {
       showErrorToast('El nombre de usuario debe tener mínimo 3 caracteres alfanuméricos.');
+      return;
+    }
+    if (isUsernameDuplicated) {
+      const uNameFinal = username.trim() || generarUsernameSugerido(primerNombre, primerApellido);
+      showErrorToast(`El nombre de usuario "@${uNameFinal}" ya se encuentra registrado por otro usuario. Elige uno diferente.`);
+      return;
+    }
+    if (isTelefonoDuplicated) {
+      showErrorToast(`El número de teléfono "${telefono.trim()}" ya se encuentra registrado por otro usuario.`);
       return;
     }
     if ((mode === 'create' || password) && !passwordsMatch) {
@@ -495,14 +550,14 @@ export function UsuarioDrawer({
                   onBlur={() => markTouched('username')}
                   disabled={isView}
                   className={`w-full pl-9 pr-8 py-2 bg-gray-50 border rounded-xl text-xs text-gray-800 outline-none transition-colors disabled:bg-gray-100/60 disabled:text-gray-600 font-mono ${
-                    touched.username && !validUsername
+                    (touched.username && !validUsername) || isUsernameDuplicated
                       ? 'border-red-400 focus:border-red-500 bg-red-50/20'
-                      : touched.username && validUsername && username
+                      : touched.username && validUsername && username && !isUsernameDuplicated
                       ? 'border-emerald-500 focus:border-emerald-500'
                       : 'border-gray-200 focus:border-[#9B0F06]'
                   }`}
                 />
-                {username && validUsername && (
+                {username && validUsername && !isUsernameDuplicated && (
                   <CheckCircle2 size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-emerald-600" />
                 )}
               </div>
@@ -511,7 +566,12 @@ export function UsuarioDrawer({
                   <AlertCircle size={11} /> Mínimo 3 caracteres (solo letras minúsculas, números, punto o guión bajo)
                 </p>
               )}
-              {username && validUsername && isCreate && (
+              {isUsernameDuplicated && (
+                <p className="text-[10px] text-red-500 mt-1 flex items-center gap-1">
+                  <AlertCircle size={11} /> Este nombre de usuario ya está registrado por otro usuario
+                </p>
+              )}
+              {username && validUsername && !isUsernameDuplicated && isCreate && (
                 <p className="text-[10px] text-gray-400 mt-0.5">
                   Podrá iniciar sesión escribiendo <span className="font-semibold text-gray-600 font-mono">@{username}</span>
                 </p>
@@ -534,20 +594,25 @@ export function UsuarioDrawer({
                   disabled={isView}
                   required
                   className={`w-full pl-9 pr-8 py-2 bg-gray-50 border rounded-xl text-xs text-gray-800 outline-none transition-colors disabled:bg-gray-100/60 disabled:text-gray-600 ${
-                    touched.correo && !validCorreo
+                    (touched.correo && !validCorreo) || isEmailDuplicated
                       ? 'border-red-400 focus:border-red-500 bg-red-50/20'
-                      : touched.correo && validCorreo
+                      : touched.correo && validCorreo && !isEmailDuplicated
                       ? 'border-emerald-500 focus:border-emerald-500'
                       : 'border-gray-200 focus:border-[#9B0F06]'
                   }`}
                 />
-                {touched.correo && validCorreo && (
+                {touched.correo && validCorreo && !isEmailDuplicated && (
                   <CheckCircle2 size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-emerald-600" />
                 )}
               </div>
               {touched.correo && !validCorreo && (
                 <p className="text-[10px] text-red-500 mt-1 flex items-center gap-1">
                   <AlertCircle size={11} /> Formato de correo electrónico inválido
+                </p>
+              )}
+              {isEmailDuplicated && (
+                <p className="text-[10px] text-red-500 mt-1 flex items-center gap-1">
+                  <AlertCircle size={11} /> Este correo electrónico ya se encuentra registrado
                 </p>
               )}
             </div>
@@ -567,15 +632,25 @@ export function UsuarioDrawer({
                   onBlur={() => markTouched('telefono')}
                   disabled={isView}
                   className={`w-full pl-9 pr-3 py-2 bg-gray-50 border rounded-xl text-xs text-gray-800 outline-none transition-colors disabled:bg-gray-100/60 disabled:text-gray-600 ${
-                    touched.telefono && !validTelefono
-                      ? 'border-red-400 focus:border-red-500'
+                    (touched.telefono && !validTelefono) || isTelefonoDuplicated
+                      ? 'border-red-400 focus:border-red-500 bg-red-50/20'
+                      : touched.telefono && validTelefono && telefono && !isTelefonoDuplicated
+                      ? 'border-emerald-500 focus:border-emerald-500'
                       : 'border-gray-200 focus:border-[#9B0F06]'
                   }`}
                 />
+                {touched.telefono && validTelefono && telefono && !isTelefonoDuplicated && (
+                  <CheckCircle2 size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-emerald-600" />
+                )}
               </div>
               {touched.telefono && !validTelefono && (
                 <p className="text-[10px] text-red-500 mt-1 flex items-center gap-1">
                   <AlertCircle size={11} /> Ingresa un número telefónico válido (mín. 8 dígitos)
+                </p>
+              )}
+              {isTelefonoDuplicated && (
+                <p className="text-[10px] text-red-500 mt-1 flex items-center gap-1">
+                  <AlertCircle size={11} /> Este número de teléfono ya se encuentra registrado por otro usuario
                 </p>
               )}
             </div>

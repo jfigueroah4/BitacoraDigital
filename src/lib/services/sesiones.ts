@@ -191,6 +191,19 @@ export function cerrarTodasSesionesRemotas(correo: string, conservarActual: bool
 }
 
 /**
+ * Elimina todas las sesiones activas de un usuario (al suspender o eliminar cuenta)
+ */
+export function limpiarSesionesUsuario(correo: string): void {
+  if (!correo) return;
+  const correoLower = correo.trim().toLowerCase();
+  const todas = getTodasLasSesiones();
+  const actualizadas = todas.filter(
+    (s) => s.usuarioCorreo?.toLowerCase() !== correoLower
+  );
+  guardarTodasLasSesiones(actualizadas);
+}
+
+/**
  * Verifica si este dispositivo aún tiene sesión válida activa
  */
 export function esSesionDispositivoValida(correo: string): boolean {

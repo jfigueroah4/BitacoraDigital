@@ -16,6 +16,9 @@ interface UsuarioTablaProps {
   onGestionarDispositivos?: (usuario: Usuario) => void;
   currentUserEmail?: string;
   canManage?: boolean;
+  sortColumn?: string;
+  sortDirection?: 'asc' | 'desc';
+  onSort?: (column: string) => void;
 }
 
 export const UsuarioTabla = React.memo(function UsuarioTabla({
@@ -26,28 +29,41 @@ export const UsuarioTabla = React.memo(function UsuarioTabla({
   onGestionarDispositivos,
   currentUserEmail,
   canManage = true,
+  sortColumn,
+  sortDirection,
+  onSort,
 }: UsuarioTablaProps) {
-  const [sortColumn, setSortColumn] = useState<string>('');
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+  const [internalSortColumn, setInternalSortColumn] = useState<string>('');
+  const [internalSortDirection, setInternalSortDirection] = useState<'asc' | 'desc'>('asc');
+
+  const effectiveSortColumn = sortColumn !== undefined ? sortColumn : internalSortColumn;
+  const effectiveSortDirection = sortDirection !== undefined ? sortDirection : internalSortDirection;
 
   const handleSort = (column: string) => {
-    if (sortColumn === column) {
-      setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+    if (onSort) {
+      onSort(column);
     } else {
-      setSortColumn(column);
-      setSortDirection('asc');
+      if (internalSortColumn === column) {
+        setInternalSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+      } else {
+        setInternalSortColumn(column);
+        setInternalSortDirection('asc');
+      }
     }
   };
 
   const sortIndicator = (column: string) =>
-    sortColumn === column ? (sortDirection === 'asc' ? ' ▲' : ' ▼') : '';
+    effectiveSortColumn === column ? (effectiveSortDirection === 'asc' ? ' ▲' : ' ▼') : '';
 
   const sortedUsuarios = useMemo(() => {
-    if (!sortColumn) return usuarios;
+    // Si el padre ya maneja el ordenamiento global de la lista, usar directamente
+    if (onSort) return usuarios;
+    if (!effectiveSortColumn) return usuarios;
+
     const sorted = [...usuarios].sort((a, b) => {
       let aVal = '';
       let bVal = '';
-      switch (sortColumn) {
+      switch (effectiveSortColumn) {
         case 'nombre':
           aVal = (a.nombre || `${a.primer_nombre} ${a.primer_apellido}`).toLowerCase();
           bVal = (b.nombre || `${b.primer_nombre} ${b.primer_apellido}`).toLowerCase();
@@ -60,18 +76,27 @@ export const UsuarioTabla = React.memo(function UsuarioTabla({
           aVal = (a.rol || '').toLowerCase();
           bVal = (b.rol || '').toLowerCase();
           break;
-        case 'estado':
-          aVal = a.estado.toLowerCase();
-          bVal = b.estado.toLowerCase();
+        case 'estado': {
+          const aSusp = a.estado === 'Suspendido' || (a as any).activo === false;
+          const bSusp = b.estado === 'Suspendido' || (b as any).activo === false;
+          const aSes = obtenerSesionesUsuario(a.correo).length > 0;
+          const bSes = obtenerSesionesUsuario(b.correo).length > 0;
+          aVal = aSusp ? '3_suspendido' : (aSes ? '1_activo' : '2_inactivo');
+          bVal = bSusp ? '3_suspendido' : (bSes ? '1_activo' : '2_inactivo');
+          break;
+        }
+        case 'ultimoAcceso':
+          aVal = (a.ultimoAcceso || '').toLowerCase();
+          bVal = (b.ultimoAcceso || '').toLowerCase();
           break;
         default:
           return 0;
       }
-      const cmp = aVal.localeCompare(bVal);
-      return sortDirection === 'asc' ? cmp : -cmp;
+      const cmp = aVal.localeCompare(bVal, 'es', { sensitivity: 'base' });
+      return effectiveSortDirection === 'asc' ? cmp : -cmp;
     });
     return sorted;
-  }, [usuarios, sortColumn, sortDirection]);
+  }, [usuarios, effectiveSortColumn, effectiveSortDirection, onSort]);
 
   return (
     <div className="font-poppins">
@@ -86,9 +111,10 @@ export const UsuarioTabla = React.memo(function UsuarioTabla({
             (usuario.primer_apellido?.[0] || '')
           ).toUpperCase();
           const isSelf = currentUserEmail && usuario.correo?.toLowerCase() === currentUserEmail.toLowerCase();
-          const esSuspendido = usuario.estado === 'Suspendido' || usuario.estado === 'Inactivo' || (usuario as any).activo === false;
+          const esSuspendido = usuario.estado === 'Suspendido' || (usuario as any).activo === false;
           const sesiones = obtenerSesionesUsuario(usuario.correo);
           const tieneSesiones = sesiones.length > 0;
+          const estadoMostrado: EstadoUsuario = esSuspendido ? 'Suspendido' : (tieneSesiones ? 'Activo' : 'Inactivo');
 
           return (
             <div
@@ -112,13 +138,17 @@ export const UsuarioTabla = React.memo(function UsuarioTabla({
                     )}
                   </div>
                 </div>
-                <UsuarioEstadoBadge estado={usuario.estado} />
+                <UsuarioEstadoBadge estado={estadoMostrado} />
               </div>
 
               <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-gray-100 text-[10.5px]">
                 <UsuarioRolBadge rol={usuario.rol} />
-                <span className="text-gray-400">&bull;</span>
-                <span className="text-gray-500 font-medium">{usuario.cargo || 'Supervisor'}</span>
+              </div>
+
+              {/* Registro de accesos (DomunNet) */}
+              <div className="flex items-center justify-between text-[10px] text-gray-500 pt-1 border-t border-gray-100">
+                <span>Último acceso: <strong className="text-gray-700">{usuario.ultimoAcceso || 'Sin accesos'}</strong></span>
+                <span className="font-semibold text-[#9B0F06]">{usuario.contadorAccesos || (tieneSesiones ? 1 : 0)} ingresos</span>
               </div>
 
               <div className="flex items-center justify-end gap-1.5 pt-2 border-t border-gray-100">
@@ -172,25 +202,30 @@ export const UsuarioTabla = React.memo(function UsuarioTabla({
                       type="button"
                       onClick={() => onEliminar(usuario.id, 'eliminar')}
                       className="p-1.5 rounded-lg border border-gray-200 bg-white text-red-600 hover:bg-red-50 cursor-pointer shadow-2xs"
-                      title="Eliminar usuario"
+                      title="Eliminar usuario definitivamente"
                     >
                       <Trash2 size={12} />
                     </button>
                   </>
                 ) : (
-                  <button
-                    type="button"
-                    onClick={() => onEliminar(usuario.id, 'suspender')}
-                    disabled={Boolean(isSelf)}
-                    className={`p-1.5 rounded-lg border shadow-2xs ${
-                      isSelf
-                        ? 'border-gray-100 bg-gray-50 text-gray-300 cursor-not-allowed'
-                        : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50 cursor-pointer'
-                    }`}
-                    title={isSelf ? 'No puedes suspender tu propia cuenta' : 'Suspender usuario'}
-                  >
-                    <UserX size={12} />
-                  </button>
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => onEliminar(usuario.id, 'suspender')}
+                      className="p-1.5 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-amber-50 hover:text-amber-600 cursor-pointer shadow-2xs"
+                      title="Suspender usuario"
+                    >
+                      <UserX size={12} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onEliminar(usuario.id, 'eliminar')}
+                      className="p-1.5 rounded-lg border border-gray-200 bg-white text-red-600 hover:bg-red-50 cursor-pointer shadow-2xs"
+                      title="Eliminar usuario definitivamente"
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                  </>
                 ))}
               </div>
             </div>
@@ -228,8 +263,11 @@ export const UsuarioTabla = React.memo(function UsuarioTabla({
                 >
                   Estado{sortIndicator('estado')}
                 </th>
-                <th className="px-4 py-3 text-[10px] text-gray-400 uppercase tracking-wider font-bold">
-                  Puesto / Cargo
+                <th
+                  className="px-4 py-3 text-[10px] text-gray-400 uppercase tracking-wider font-bold cursor-pointer hover:text-gray-600 select-none"
+                  onClick={() => handleSort('ultimoAcceso')}
+                >
+                  Último Acceso / Ingresos{sortIndicator('ultimoAcceso')}
                 </th>
                 <th className="text-right px-4 py-3 text-[10px] text-gray-400 uppercase tracking-wider font-bold">
                   Acciones
@@ -246,9 +284,10 @@ export const UsuarioTabla = React.memo(function UsuarioTabla({
                   (usuario.primer_apellido?.[0] || '')
                 ).toUpperCase();
                 const isSelf = currentUserEmail && usuario.correo?.toLowerCase() === currentUserEmail.toLowerCase();
-                const esSuspendido = usuario.estado === 'Suspendido' || usuario.estado === 'Inactivo' || (usuario as any).activo === false;
+                const esSuspendido = usuario.estado === 'Suspendido' || (usuario as any).activo === false;
                 const sesiones = obtenerSesionesUsuario(usuario.correo);
                 const tieneSesiones = sesiones.length > 0;
+                const estadoMostrado: EstadoUsuario = esSuspendido ? 'Suspendido' : (tieneSesiones ? 'Activo' : 'Inactivo');
 
                 return (
                   <tr key={usuario.id} className="hover:bg-gray-50/70 transition-colors">
@@ -279,10 +318,15 @@ export const UsuarioTabla = React.memo(function UsuarioTabla({
                       <UsuarioRolBadge rol={usuario.rol} />
                     </td>
                     <td className="px-4 py-3.5">
-                      <UsuarioEstadoBadge estado={usuario.estado} />
+                      <UsuarioEstadoBadge estado={estadoMostrado} />
                     </td>
-                    <td className="px-4 py-3.5 text-gray-600 text-[11px]">
-                      {usuario.cargo || 'Supervisor de Campo'}
+                    <td className="px-4 py-3.5 text-[11px]">
+                      <p className="font-semibold text-gray-800 leading-tight">
+                        {usuario.ultimoAcceso || 'Sin accesos'}
+                      </p>
+                      <p className="text-[10px] text-[#9B0F06] font-medium mt-0.5">
+                        {usuario.contadorAccesos || (tieneSesiones ? 1 : 0)} {usuario.contadorAccesos === 1 ? 'ingreso' : 'ingresos'}
+                      </p>
                     </td>
                     <td className="text-right px-4 py-3.5">
                       <div className="flex items-center justify-end gap-1">
@@ -338,25 +382,30 @@ export const UsuarioTabla = React.memo(function UsuarioTabla({
                               type="button"
                               onClick={() => onEliminar(usuario.id, 'eliminar')}
                               className="p-1 text-gray-400 hover:text-red-600 transition-colors cursor-pointer"
-                              title="Eliminar usuario"
+                              title="Eliminar usuario definitivamente"
                             >
                               <Trash2 size={13} />
                             </button>
                           </>
                         ) : (
-                          <button
-                            type="button"
-                            onClick={() => onEliminar(usuario.id, 'suspender')}
-                            disabled={Boolean(isSelf)}
-                            className={`p-1 transition-colors ${
-                              isSelf
-                                ? 'text-gray-200 cursor-not-allowed'
-                                : 'text-gray-400 hover:text-red-600 cursor-pointer'
-                            }`}
-                            title={isSelf ? 'No puedes suspender tu propia cuenta' : 'Suspender usuario'}
-                          >
-                            <UserX size={13} />
-                          </button>
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => onEliminar(usuario.id, 'suspender')}
+                              className="p-1 text-gray-400 hover:text-amber-600 transition-colors cursor-pointer"
+                              title="Suspender usuario (bloquea su acceso)"
+                            >
+                              <UserX size={13} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => onEliminar(usuario.id, 'eliminar')}
+                              className="p-1 text-gray-400 hover:text-red-600 transition-colors cursor-pointer"
+                              title="Eliminar usuario definitivamente"
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          </>
                         ))}
                       </div>
                     </td>

@@ -88,45 +88,46 @@ export default function DashboardPage() {
         } catch (_) {}
       }
 
-      // Sincronizar duración guardada en servidor o cookie como respaldo
-      fetch('/api/config')
-        .then((res) => res.json())
-        .then((data) => {
+      // Sincronizar duración guardada en Supabase Storage (compartida para todos los dispositivos)
+      const cargarDuracionCompartida = async () => {
+        try {
+          const res = await fetch('/api/config');
+          const data = await res.json();
           if (data?.success && data?.duracion) {
             setDuracionProyecto(data.duracion);
             try {
               localStorage.setItem('bitacora_duracion_proyecto', JSON.stringify(data.duracion));
             } catch (_) {}
+            return;
           }
-        })
-        .catch(() => {});
+        } catch (_) {}
 
-      // Limpiar datos quemados antiguos del caché si existieran
-      try {
-        const rawDocs = localStorage.getItem('bitacora_documentos_lista');
-        if (rawDocs && rawDocs.includes('doc-2026-')) {
-          localStorage.removeItem('bitacora_documentos_lista');
-        }
-      } catch (_) {}
+        // Respaldo directo a la URL pública de Supabase Storage
+        try {
+          const resPublic = await fetch(
+            `https://nzfmpkprenezcuvshomd.supabase.co/storage/v1/object/public/Bitacora-documentos/config/duracion.json?t=${Date.now()}`
+          );
+          if (resPublic.ok) {
+            const pubData = await resPublic.json();
+            if (pubData && pubData.mesInicio) {
+              setDuracionProyecto(pubData);
+              try {
+                localStorage.setItem('bitacora_duracion_proyecto', JSON.stringify(pubData));
+              } catch (_) {}
+            }
+          }
+        } catch (_) {}
+      };
 
-      // Cargar reportes reales desde Supabase DB
+      cargarDuracionCompartida();
+
+      // Cargar reportes reales desde Supabase DB (fuente de verdad definitiva)
       obtenerReportesBitacora().then((reportesBD) => {
-        if (reportesBD && reportesBD.length > 0) {
+        if (Array.isArray(reportesBD)) {
           setDocumentos(reportesBD);
-          localStorage.setItem('bitacora_documentos_lista', JSON.stringify(reportesBD));
-        } else {
-          const storedDocs = localStorage.getItem('bitacora_documentos_lista');
-          if (storedDocs) {
-            try {
-              const parsed = JSON.parse(storedDocs);
-              if (Array.isArray(parsed)) {
-                const filtrados = parsed.filter((d: any) => !d.id?.startsWith('doc-2026-'));
-                setDocumentos(filtrados);
-                return;
-              }
-            } catch (_) {}
-          }
-          setDocumentos([]);
+          try {
+            localStorage.setItem('bitacora_documentos_lista', JSON.stringify(reportesBD));
+          } catch (_) {}
         }
       });
     } catch (e) {
@@ -137,7 +138,7 @@ export default function DashboardPage() {
 
   const esAdmin = userProfile?.rol === 'Administrador';
 
-  // Guardar nueva duración del proyecto (Persistente en servidor, cookie y localStorage)
+  // Guardar nueva duración del proyecto (Persistente en Supabase Storage, servidor, cookie y localStorage)
   const handleGuardarDuracion = (nueva: DuracionProyecto) => {
     setDuracionProyecto(nueva);
     try {
@@ -146,15 +147,32 @@ export default function DashboardPage() {
         JSON.stringify(nueva)
       )}; path=/; max-age=315360000; SameSite=Lax`;
     } catch (_) {}
+
+    // 1. Guardar en API route (Cloudflare Edge con Supabase Admin)
     fetch('/api/config', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(nueva),
     }).catch(() => {});
+
+    // 2. Respaldo directo a Supabase Storage desde cliente si está disponible
+    try {
+      import('@/lib/supabase/client').then(({ isSupabaseConfigured, supabase }) => {
+        if (isSupabaseConfigured() && supabase) {
+          const blob = new Blob([JSON.stringify(nueva)], { type: 'application/json' });
+          supabase.storage
+            .from('Bitacora-documentos')
+            .upload('config/duracion.json', blob, { upsert: true, cacheControl: '0' })
+            .catch(() => {});
+        }
+      });
+    } catch (_) {}
+
     showSuccessToast(
-      `Duración actualizada: ahora se muestran todos los meses desde inicio hasta fin de obra.`
+      `Duración guardada para todos los usuarios: ${MESES_NOMBRES[nueva.mesInicio - 1]} ${nueva.anioInicio} a ${MESES_NOMBRES[nueva.mesFin - 1]} ${nueva.anioFin}`
     );
   };
+
 
   // Generate months based on project duration and documents
   const todosMeses = useMemo(() => {

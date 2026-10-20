@@ -282,8 +282,8 @@ export default function LoginPage() {
             : passTrim === 'mariobros25';
 
           if (passwordValida) {
-            if (usuarioPorUsername.estado === 'Inactivo') {
-              showErrorToast('Su cuenta se encuentra inactiva. Contacte al administrador.');
+            if (usuarioPorUsername.estado === 'Suspendido' || usuarioPorUsername.activo === false) {
+              showErrorToast('Su cuenta se encuentra suspendida. Contacte al administrador.');
               setIsSubmitting(false);
               return;
             }
@@ -342,6 +342,18 @@ export default function LoginPage() {
         return;
       }
 
+      // Verificar si el usuario identificado está suspendido
+      const userRegistrado = listUsuarios.find(
+        (u: any) =>
+          (u.correo && u.correo.toLowerCase() === authUser.email.toLowerCase()) ||
+          (u.username && u.username.toLowerCase() === cleanUser)
+      );
+      if (userRegistrado && (userRegistrado.estado === 'Suspendido' || userRegistrado.activo === false)) {
+        showErrorToast('Su cuenta se encuentra suspendida. Contacte al administrador.');
+        setIsSubmitting(false);
+        return;
+      }
+
       // 4. Credenciales correctas: limpiar intentos fallidos
       localStorage.removeItem('bitacora_failed_login_attempts');
 
@@ -367,6 +379,51 @@ export default function LoginPage() {
         showErrorToast('Límite de 2 dispositivos alcanzado. Cierra una sesión previa para ingresar.');
         return;
       }
+
+      // Registrar último acceso y contador de ingresos en bitacora_usuarios_lista
+      const fechaAhora = new Date().toLocaleString('es-GT', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true,
+      });
+
+      let usuarioActualizado = false;
+      const nuevaListaUsuarios = listUsuarios.map((u: any) => {
+        if (
+          (u.correo && u.correo.toLowerCase() === authUser.email.toLowerCase()) ||
+          (u.username && u.username.toLowerCase() === cleanUser)
+        ) {
+          usuarioActualizado = true;
+          return {
+            ...u,
+            ultimoAcceso: fechaAhora,
+            contadorAccesos: (u.contadorAccesos || 0) + 1,
+          };
+        }
+        return u;
+      });
+
+      if (!usuarioActualizado) {
+        nuevaListaUsuarios.push({
+          id: authUser.id,
+          primer_nombre: authUser.nombre.split(' ')[0] || 'Usuario',
+          primer_apellido: authUser.nombre.split(' ').slice(1).join(' ') || '',
+          nombre: authUser.nombre,
+          correo: authUser.email,
+          username: cleanUser || authUser.email.split('@')[0],
+          rol: authUser.rol,
+          cargo: authUser.cargo,
+          estado: 'Activo',
+          fechaCreacion: '2026-01-01',
+          ultimoAcceso: fechaAhora,
+          contadorAccesos: 1,
+        });
+      }
+
+      localStorage.setItem('bitacora_usuarios_lista', JSON.stringify(nuevaListaUsuarios));
 
       // Guardar cookies y perfil
       document.cookie = `bitacora_token=${sessionToken}; path=/; max-age=28800; SameSite=Lax`;
