@@ -20,7 +20,7 @@ export default function SoportePage() {
 
   return (
     <div className="min-h-screen bg-[#F3F4F7] text-[#07152B] flex flex-col font-poppins selection:bg-[#3B2219] selection:text-white">
-      <TopBar bitacoraNombre="Proyecto: Conexion VAS - Hincapie • SOPORTE" />
+      <TopBar seccion="Soporte Técnico" bitacoraNombre="Proyecto: Conexion VAS – Hincapie" />
 
       <main className="flex-1 w-full max-w-6xl mx-auto p-4 sm:p-6 lg:p-8 flex flex-col justify-center">
         {/* Header con botón Volver */}

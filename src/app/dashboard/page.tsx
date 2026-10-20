@@ -346,11 +346,8 @@ export default function DashboardPage() {
     <div className="min-h-screen bg-[#F3F4F7] text-[#07152B] flex flex-col font-poppins selection:bg-[#3B2219] selection:text-white">
       {/* TopBar with brand, search bar, clickable book logo to return home */}
       <TopBar
-        bitacoraNombre={
-          mesActivoObj
-            ? `Proyecto: Conexion VAS - Hincapie • ${mesActivoObj.nombre} ${mesActivoObj.anio}`
-            : 'Proyecto: Conexion VAS - Hincapie'
-        }
+        seccion={mesActivoObj ? mesActivoObj.nombre : 'Bitácora General'}
+        bitacoraNombre="Proyecto: Conexion VAS – Hincapie"
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         userProfile={userProfile}

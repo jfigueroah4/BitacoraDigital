@@ -28,6 +28,7 @@ interface TopBarProps {
   onSearchChange?: (val: string) => void;
   userProfile?: UserProfile | null;
   bitacoraNombre?: string;
+  seccion?: string;
   onVolverInicio?: () => void;
 }
 
@@ -103,6 +104,7 @@ export default function TopBar({
   onSearchChange,
   userProfile,
   bitacoraNombre = 'Proyecto: Conexion VAS - Hincapie',
+  seccion,
   onVolverInicio,
 }: TopBarProps) {
   const router = useRouter();
@@ -118,53 +120,44 @@ export default function TopBar({
     return rol.includes('admin');
   }, [currentUser]);
 
-  // Indicador dinámico de sección y título mostrado en TopBar
-  const { seccionActiva, tituloMostrado } = useMemo(() => {
-    if (bitacoraNombre.includes('•')) {
-      const partes = bitacoraNombre.split('•').map((s) => s.trim());
-      const seccion = partes.slice(1).join(' • ');
-      return {
-        seccionActiva: seccion.toUpperCase(),
-        tituloMostrado: bitacoraNombre,
-      };
+  // Indicador dinámico de Proyecto (superior) y Sección (inferior)
+  const { nombreProyecto, seccionMostrada } = useMemo(() => {
+    let proyecto = 'Proyecto: Conexion VAS – Hincapie';
+    let seccionFinal = seccion || '';
+
+    if (bitacoraNombre) {
+      if (bitacoraNombre.includes('•')) {
+        const partes = bitacoraNombre.split('•').map((s) => s.trim());
+        proyecto = partes[0] || proyecto;
+        if (!seccionFinal && partes[1]) {
+          seccionFinal = partes[1];
+        }
+      } else {
+        proyecto = bitacoraNombre;
+      }
     }
 
-    if (pathname.includes('/dashboard/usuarios')) {
-      return {
-        seccionActiva: 'USUARIOS Y ROLES',
-        tituloMostrado: `${bitacoraNombre} • Usuarios`,
-      };
-    }
-    if (pathname.includes('/dashboard/roles')) {
-      return {
-        seccionActiva: 'ROLES Y PERMISOS',
-        tituloMostrado: `${bitacoraNombre} • Roles`,
-      };
-    }
-    if (pathname.includes('/dashboard/tickets')) {
-      return {
-        seccionActiva: 'TICKETS DE SOPORTE',
-        tituloMostrado: `${bitacoraNombre} • Tickets`,
-      };
-    }
-    if (pathname.includes('/dashboard/soporte')) {
-      return {
-        seccionActiva: 'SOPORTE TÉCNICO',
-        tituloMostrado: `${bitacoraNombre} • Soporte`,
-      };
-    }
-    if (pathname.includes('/dashboard/perfil')) {
-      return {
-        seccionActiva: 'MI PERFIL',
-        tituloMostrado: `${bitacoraNombre} • Mi Perfil`,
-      };
+    if (!seccionFinal) {
+      if (pathname.includes('/dashboard/usuarios')) {
+        seccionFinal = 'Gestión de Usuarios';
+      } else if (pathname.includes('/dashboard/roles')) {
+        seccionFinal = 'Roles y Permisos';
+      } else if (pathname.includes('/dashboard/tickets')) {
+        seccionFinal = 'Tickets de Soporte';
+      } else if (pathname.includes('/dashboard/soporte')) {
+        seccionFinal = 'Soporte Técnico';
+      } else if (pathname.includes('/dashboard/perfil')) {
+        seccionFinal = 'Mi Perfil';
+      } else {
+        seccionFinal = 'Bitácora General';
+      }
     }
 
     return {
-      seccionActiva: 'BITÁCORA GENERAL',
-      tituloMostrado: bitacoraNombre,
+      nombreProyecto: proyecto,
+      seccionMostrada: seccionFinal,
     };
-  }, [pathname, bitacoraNombre]);
+  }, [pathname, bitacoraNombre, seccion]);
 
   // Search state similar to DomunNet
   const [internalQuery, setInternalQuery] = useState(searchQuery);
@@ -385,7 +378,7 @@ export default function TopBar({
   };
 
   return (
-    <header className="relative z-50 flex items-center justify-between h-[44px] bg-white border-b border-gray-200 px-3 sm:px-6 shrink-0 w-full shadow-2xs">
+    <header className="relative z-50 flex items-center justify-between h-[48px] sm:h-[52px] bg-white border-b border-gray-200/80 px-3 sm:px-6 shrink-0 w-full shadow-2xs">
       {/* Left Section: Bitacora Branding / Title */}
       <div
         onClick={handleLogoClick}
@@ -395,21 +388,19 @@ export default function TopBar({
         <div className="flex items-center justify-center shrink-0">
           <Image
             src="/logo.png"
-            alt="DOMUN Logo"
-            width={24}
-            height={24}
-            className="object-contain"
+            alt="DOMUM Logo"
+            width={28}
+            height={28}
+            className="w-7 h-7 sm:w-8 sm:h-8 object-contain"
             priority
           />
         </div>
-        <div className="flex flex-col leading-tight select-none">
-          <div className="flex items-center gap-1.5 text-[8px] font-semibold uppercase tracking-wider hidden sm:flex">
-            <span className="text-gray-400">Módulo de Bitácora Electrónica</span>
-            <span className="text-gray-300">•</span>
-            <span className="text-[#3B2219] font-bold tracking-normal">{seccionActiva}</span>
-          </div>
-          <span className="text-[11px] sm:text-[12px] text-gray-800 font-semibold tracking-tight truncate max-w-[200px] sm:max-w-none group-hover:text-[#3B2219] transition-colors">
-            {tituloMostrado}
+        <div className="flex flex-col leading-tight select-none min-w-0">
+          <span className="text-[10px] sm:text-[11px] text-[#8898AA] font-semibold tracking-wide truncate">
+            {nombreProyecto}
+          </span>
+          <span className="text-[13px] sm:text-[14.5px] text-[#0F172A] font-bold tracking-tight truncate max-w-[220px] sm:max-w-none group-hover:text-[#3B2219] transition-colors leading-tight">
+            {seccionMostrada}
           </span>
         </div>
       </div>
@@ -506,7 +497,7 @@ export default function TopBar({
 
           {/* Profile Dropdown */}
           {profileOpen && (
-            <div className="absolute top-[44px] right-0 w-60 bg-white border border-gray-100 rounded-xl shadow-xl z-50 overflow-hidden animate-fadeIn font-poppins">
+            <div className="absolute top-full mt-1.5 right-0 w-60 bg-white border border-gray-100 rounded-xl shadow-xl z-50 overflow-hidden animate-fadeIn font-poppins">
               <div className="px-4 py-3 border-b border-gray-100 bg-gray-50/70">
                 <p className="text-[12px] font-bold text-gray-900 leading-tight">
                   {currentUser?.nombre || 'Usuario'}

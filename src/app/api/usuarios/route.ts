@@ -10,7 +10,7 @@ const USUARIO_DFIGUEROA = {
   id: '1f36ea33-admin-dfigueroa',
   primer_nombre: 'Daniel',
   primer_apellido: 'Figueroa',
-  username: 'dfigueroa',
+  username: 'DFIGUEROA',
   nombre: 'Daniel Figueroa',
   correo: 'admin@bitacoradigital.com',
   rol: 'Administrador',
@@ -33,10 +33,9 @@ export async function GET() {
         if (Array.isArray(data) && data.length > 0) {
           // Garantizar que dfigueroa siempre tenga username dfigueroa
           const corregidos = data.map((u: any) => {
-            if (u.correo?.toLowerCase() === 'admin@bitacoradigital.com') {
-              return { ...u, username: 'dfigueroa' };
-            }
-            return u;
+            const isDFig = u.correo?.toLowerCase() === 'admin@bitacoradigital.com';
+            const uname = isDFig ? 'DFIGUEROA' : (u.username || u.correo?.split('@')[0] || 'USUARIO');
+            return { ...u, username: uname.toUpperCase() };
           });
           return NextResponse.json({ success: true, usuarios: corregidos });
         }
@@ -54,7 +53,7 @@ export async function GET() {
           id: p.usuario_id || p.id,
           primer_nombre: p.primer_nombre || 'Usuario',
           primer_apellido: p.primer_apellido || '',
-          username: p.correo?.toLowerCase() === 'admin@bitacoradigital.com' ? 'dfigueroa' : (p.username || p.correo?.split('@')[0] || 'usuario'),
+          username: p.correo?.toLowerCase() === 'admin@bitacoradigital.com' ? 'DFIGUEROA' : (p.username || p.correo?.split('@')[0] || 'usuario'),
           nombre: p.nombre_completo || 'Usuario',
           correo: p.correo || '',
           rol: p.rol || 'Usuario',
@@ -95,7 +94,7 @@ export async function POST(req: NextRequest) {
 
     const nombreCompleto = `${primer_nombre || ''} ${segundo_nombre || ''} ${primer_apellido || ''} ${segundo_apellido || ''}`.replace(/\s+/g, ' ').trim();
     const finalEmail = (correo || '').trim().toLowerCase();
-    const finalUsername = (username || `${primer_nombre?.[0] || ''}${primer_apellido || ''}`).replace(/[^A-Za-z0-9._]/g, '');
+    const finalUsername = (username || `${primer_nombre?.[0] || ''}${primer_apellido || ''}`).replace(/[^A-Za-z0-9._]/g, '').toUpperCase();
 
     let authUserId: string | null = null;
 

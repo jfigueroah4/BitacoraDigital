@@ -13,31 +13,11 @@ import { useCustomToast } from '@/hooks/useCustomToast';
 import { UserProfile, UserRole } from '@/types/bitacora';
 import { supabase } from '@/lib/supabase/client';
 
-type AccesoRapido = {
-  id: string;
-  name: string;
-  email: string;
-  password: string;
-  role: UserRole;
-  roleLabel: string;
-};
-
 type SavedAccount = {
   username: string;
   password?: string;
   role?: UserRole;
 };
-
-const ACCESOS_RAPIDOS: AccesoRapido[] = [
-  {
-    id: 'admin',
-    name: 'Daniel Figueroa',
-    email: 'admin@bitacoradigital.com',
-    password: 'mariobros25',
-    role: 'Administrador',
-    roleLabel: 'Administrador (Acceso Principal)',
-  },
-];
 
 export default function LoginPage() {
   const router = useRouter();
@@ -48,7 +28,6 @@ export default function LoginPage() {
   const [passwordError, setPasswordError] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
-  const [isQuickAccessOpen, setIsQuickAccessOpen] = useState(false);
   const [isRecoveryOpen, setIsRecoveryOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [rememberedAccounts, setRememberedAccounts] = useState<SavedAccount[]>([]);
@@ -183,7 +162,7 @@ export default function LoginPage() {
           const { data: dbPerfil } = await supabase
             .from('perfil_usuario')
             .select('*, usuario(*)')
-            .eq('username', cleanUser)
+            .ilike('username', cleanUser)
             .maybeSingle();
 
           if (dbPerfil?.usuario?.correo || dbPerfil?.correo) {
@@ -225,29 +204,10 @@ export default function LoginPage() {
         } catch (_) {}
       }
 
-      // 2. Validar con Accesos Rápidos y Usuarios Registrados
+      // 2. Validar con Usuarios Base o Registrados
       if (!authUser) {
-        // Validar contra ACCESOS_RAPIDOS y usuariosBaseMap
-        const matchedQuick = ACCESOS_RAPIDOS.find(
-          (a) =>
-            (a.email.toLowerCase() === userTrim ||
-              a.id.toLowerCase() === cleanUser ||
-              a.name.toLowerCase() === cleanUser) &&
-            a.password === passTrim
-        );
-
-        if (matchedQuick) {
-          authUser = {
-            id: matchedQuick.id,
-            nombre: matchedQuick.name,
-            email: matchedQuick.email,
-            rol: matchedQuick.role,
-            cargo:
-              matchedQuick.role === 'Administrador'
-                ? 'Administrador de Proyecto'
-                : 'Supervisor de Obra',
-          };
-        } else if (usuariosBaseMap[cleanUser] && passTrim === 'mariobros25') {
+        const passUpper = passTrim.toUpperCase();
+        if (usuariosBaseMap[cleanUser] && (passUpper === 'VAS-HINCAPIE' || passTrim === 'mariobros25')) {
           const uBase = usuariosBaseMap[cleanUser];
           authUser = {
             id: `base-${cleanUser}`,
@@ -463,41 +423,6 @@ export default function LoginPage() {
         <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-transparent to-black/60 pointer-events-none" />
       </div>
 
-      {/* TOP NAVBAR: Botón de Acceso Rápido / Demo */}
-      <div className="absolute top-0 left-0 right-0 h-[64px] z-20 flex items-center justify-end pr-6 pointer-events-auto">
-        <button
-          type="button"
-          onClick={() => setIsQuickAccessOpen(true)}
-          style={{
-            width: '40px',
-            height: '40px',
-            borderRadius: '8px',
-            background: 'rgba(255, 255, 255, 0.08)',
-            border: '1px solid rgba(255, 255, 255, 0.15)',
-            color: 'rgba(255, 255, 255, 0.7)',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            transition: 'all 0.2s',
-            fontSize: '18px',
-          }}
-          onMouseOver={(e) => {
-            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)';
-            e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)';
-            e.currentTarget.style.color = 'rgba(255, 255, 255, 0.9)';
-          }}
-          onMouseOut={(e) => {
-            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)';
-            e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.15)';
-            e.currentTarget.style.color = 'rgba(255, 255, 255, 0.7)';
-          }}
-          title="Acceso rápido demo (Administrador / Usuario)"
-        >
-          ?
-        </button>
-      </div>
-
       {/* Contenedor principal centrado */}
       <div
         className="login-container relative z-10 flex flex-col items-center w-[90%] max-w-[310px]"
@@ -687,186 +612,6 @@ export default function LoginPage() {
           </LoginButton>
         </form>
       </div>
-
-      {/* Quick Access Modal (Acceso Rápido por Roles) */}
-      {isQuickAccessOpen && (
-        <>
-          <div
-            onClick={() => setIsQuickAccessOpen(false)}
-            style={{
-              position: 'fixed',
-              inset: 0,
-              background: 'rgba(0, 0, 0, 0.6)',
-              zIndex: 9998,
-              backdropFilter: 'blur(4px)',
-            }}
-          />
-
-          <div
-            style={{
-              position: 'fixed',
-              top: '50%',
-              left: '50%',
-              transform: 'translate(-50%, -50%)',
-              zIndex: 9999,
-              width: '92%',
-              maxWidth: '430px',
-            }}
-          >
-            <div
-              style={{
-                background: 'rgba(12, 12, 12, 0.98)',
-                border: '1px solid rgba(255, 255, 255, 0.12)',
-                borderRadius: '16px',
-                padding: '24px',
-                backdropFilter: 'blur(20px)',
-                boxShadow: '0 25px 60px rgba(0, 0, 0, 0.6)',
-              }}
-            >
-              {/* Header */}
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  marginBottom: '18px',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <div
-                    style={{
-                      padding: '8px',
-                      background: 'rgba(255, 255, 255, 0.08)',
-                      border: '1px solid rgba(255, 255, 255, 0.15)',
-                      borderRadius: '8px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
-                  >
-                    <Info size={18} color="#ffffff" />
-                  </div>
-                  <div>
-                    <h2
-                      style={{
-                        margin: '0',
-                        fontSize: '15px',
-                        fontWeight: 700,
-                        color: 'rgba(255, 255, 255, 0.95)',
-                        fontFamily: "'Poppins', sans-serif",
-                      }}
-                    >
-                      Acceso Rápido por Rol
-                    </h2>
-                    <p
-                      style={{
-                        margin: '2px 0 0',
-                        fontSize: '11px',
-                        color: 'rgba(255, 255, 255, 0.65)',
-                        fontFamily: "'Poppins', sans-serif",
-                      }}
-                    >
-                      Selecciona una cuenta para probar los 2 roles
-                    </p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setIsQuickAccessOpen(false)}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    cursor: 'pointer',
-                    color: 'rgba(255, 255, 255, 0.6)',
-                  }}
-                >
-                  <X size={18} />
-                </button>
-              </div>
-
-              {/* Accounts */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '16px' }}>
-                {ACCESOS_RAPIDOS.map((cuenta) => (
-                  <button
-                    key={cuenta.id}
-                    type="button"
-                    onClick={() => {
-                      setUsername(cuenta.email);
-                      setPassword(cuenta.password);
-                      setIsQuickAccessOpen(false);
-                    }}
-                    style={{
-                      padding: '12px 14px',
-                      border: '1px solid rgba(255, 255, 255, 0.1)',
-                      borderRadius: '10px',
-                      background: 'rgba(255, 255, 255, 0.04)',
-                      cursor: 'pointer',
-                      textAlign: 'left',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      transition: 'all 0.2s',
-                    }}
-                    onMouseOver={(e) => {
-                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)';
-                      e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)';
-                    }}
-                    onMouseOut={(e) => {
-                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.04)';
-                      e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
-                    }}
-                  >
-                    <div>
-                      <div
-                        style={{
-                          fontSize: '12.5px',
-                          fontWeight: 700,
-                          color: '#FFFFFF',
-                          fontFamily: "'Poppins', sans-serif",
-                        }}
-                      >
-                        <span>{cuenta.roleLabel}</span>
-                      </div>
-                      <div
-                        style={{
-                          fontSize: '11px',
-                          color: 'rgba(255, 255, 255, 0.65)',
-                          marginTop: '3px',
-                          fontFamily: "'Poppins', sans-serif",
-                        }}
-                      >
-                        {cuenta.name} &bull; {cuenta.email}
-                      </div>
-                    </div>
-                  </button>
-                ))}
-              </div>
-
-              {/* Info Note */}
-              <div
-                style={{
-                  padding: '10px 12px',
-                  background: 'rgba(255, 255, 255, 0.05)',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
-                  borderRadius: '8px',
-                }}
-              >
-                <p
-                  style={{
-                    margin: 0,
-                    fontSize: '11px',
-                    color: 'rgba(255, 255, 255, 0.85)',
-                    fontFamily: "'Poppins', sans-serif",
-                    lineHeight: '1.4',
-                  }}
-                >
-                  <strong className="text-white">Rol Administrador:</strong> Puede subir documentos PDF al bucket de Supabase y publicarlos en los días. <strong className="text-white">Rol Usuario:</strong> Puede explorar meses, días y consultar los PDF embebidos.
-                </p>
-              </div>
-            </div>
-          </div>
-        </>
-      )}
 
       {/* Modal de recuperación de contraseña */}
       <PasswordRecoveryModal
