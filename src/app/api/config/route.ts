@@ -81,9 +81,10 @@ export async function POST(req: NextRequest) {
 
       // 1. Guardar en Supabase Storage para que se refleje inmediatamente en todos los clientes
       try {
-        const serviceKey =
-          process.env.SUPABASE_SERVICE_ROLE_KEY ||
-          'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im56Zm1wa3ByZW5lemN1dnNob21kIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc5MjA5NTk2NSwiZXhwIjoyMTA3NjcxOTY1fQ.FSbkPuU06Yo6dkmBUsNdVdKgopQa9bzvW229cY0hPug';
+        const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+        if (!serviceKey) {
+          console.warn('[API Config POST] SUPABASE_SERVICE_ROLE_KEY no configurado en variables de entorno');
+        } else {
         await fetch(
           'https://nzfmpkprenezcuvshomd.supabase.co/storage/v1/object/Bitacora-documentos/config/duracion.json',
           {
@@ -95,8 +96,9 @@ export async function POST(req: NextRequest) {
               'x-upsert': 'true',
             },
             body: JSON.stringify(nuevaDuracion),
-          }
-        );
+            }
+          );
+        }
       } catch (storageErr) {
         console.warn('[API Config POST] Error guardando en Supabase Storage:', storageErr);
       }

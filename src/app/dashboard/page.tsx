@@ -155,25 +155,6 @@ export default function DashboardPage() {
       body: JSON.stringify(nueva),
     }).catch(() => {});
 
-    // 2. Respaldo directo a Supabase Storage desde cliente
-    try {
-      const serviceKey =
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im56Zm1wa3ByZW5lemN1dnNob21kIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc5MjA5NTk2NSwiZXhwIjoyMTA3NjcxOTY1fQ.FSbkPuU06Yo6dkmBUsNdVdKgopQa9bzvW229cY0hPug';
-      fetch(
-        'https://nzfmpkprenezcuvshomd.supabase.co/storage/v1/object/Bitacora-documentos/config/duracion.json',
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${serviceKey}`,
-            'apikey': serviceKey,
-            'Content-Type': 'application/json',
-            'x-upsert': 'true',
-          },
-          body: JSON.stringify(nueva),
-        }
-      ).catch(() => {});
-    } catch (_) {}
-
     showSuccessToast(
       `Duración guardada para todos los usuarios: ${MESES_NOMBRES[nueva.mesInicio - 1]} ${nueva.anioInicio} a ${MESES_NOMBRES[nueva.mesFin - 1]} ${nueva.anioFin}`
     );
