@@ -770,7 +770,7 @@ export default function UsuariosPage() {
 
             {/* Pestañas de Estado (Desktop) */}
             <div className="hidden sm:flex items-center gap-0.5 bg-gray-100 p-0.5 rounded-xl">
-              {(['Todos', 'Activo', 'Suspendido'] as const).map((est) => (
+              {(['Todos', 'Activo', 'Inactivo', 'Suspendido'] as const).map((est) => (
                 <button
                   key={est}
                   type="button"

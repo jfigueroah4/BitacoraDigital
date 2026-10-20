@@ -259,3 +259,17 @@ export function esSesionDispositivoValida(correo: string): boolean {
   const sesiones = obtenerSesionesUsuario(correo);
   return sesiones.some((s) => s.id === currentDeviceId);
 }
+
+
+export async function obtenerTodasLasSesionesServidor(): Promise<DispositivoSesion[]> {
+  try {
+    const res = await fetch(`/api/sesiones?t=${Date.now()}`, { cache: 'no-store' });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success && Array.isArray(data.sesiones)) {
+        return data.sesiones;
+      }
+    }
+  } catch (_) {}
+  return [];
+}

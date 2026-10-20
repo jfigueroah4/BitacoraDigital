@@ -7,6 +7,8 @@ import {
   obtenerSesionesUsuario,
   sincronizarSesionesServidor,
   cerrarSesionDispositivo,
+  cerrarTodasSesionesRemotas,
+  limpiarSesionesUsuario,
   MAX_DISPOSITIVOS_PERMITIDOS,
 } from '@/lib/services/sesiones';
 import { showSuccessToast } from '@/components/ui/Toast';
@@ -28,17 +30,16 @@ export default function ModalDispositivosConectados({
 }: ModalDispositivosConectadosProps) {
   const [sesiones, setSesiones] = useState<DispositivoSesion[]>([]);
   const [cerrandoId, setCerrandoId] = useState<string | null>(null);
+  const [cerrandoTodas, setCerrandoTodas] = useState(false);
 
   const cargarSesiones = async () => {
     if (!usuarioCorreo) return;
-    // Carga rápida local
     const local = obtenerSesionesUsuario(usuarioCorreo);
     setSesiones(local);
 
-    // Sincronización en vivo desde servidor
     try {
       const servidor = await sincronizarSesionesServidor(usuarioCorreo);
-      if (servidor && servidor.length > 0) {
+      if (servidor) {
         setSesiones(servidor);
       }
     } catch (_) {}
@@ -58,6 +59,18 @@ export default function ModalDispositivosConectados({
     showSuccessToast(`Sesión cerrada correctamente en ${nombreDispositivo}.`);
     await cargarSesiones();
     setCerrandoId(null);
+    onSesionCerrada?.();
+  };
+
+  const handleCerrarTodas = async () => {
+    setCerrandoTodas(true);
+    limpiarSesionesUsuario(usuarioCorreo);
+    try {
+      await fetch(`/api/sesiones?correo=${encodeURIComponent(usuarioCorreo)}`, { method: 'DELETE' });
+    } catch (_) {}
+    showSuccessToast(`Todas las sesiones de ${usuarioNombre || 'usuario'} fueron finalizadas.`);
+    setSesiones([]);
+    setCerrandoTodas(false);
     onSesionCerrada?.();
   };
 
@@ -96,14 +109,21 @@ export default function ModalDispositivosConectados({
             </button>
           </div>
 
-          {/* Subtítulo informativo */}
-          <div className="flex items-center justify-between text-xs">
+          {/* Subtítulo informativo y botón cerrar todas */}
+          <div className="flex items-center justify-between text-xs gap-2">
             <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500">
               Sesiones activas ({sesiones.length} de {MAX_DISPOSITIVOS_PERMITIDOS}):
             </span>
-            <span className="text-[10px] font-semibold text-gray-600 bg-gray-100 px-2 py-0.5 rounded-full border border-gray-200">
-              Límite: {MAX_DISPOSITIVOS_PERMITIDOS} equipos
-            </span>
+            {sesiones.length > 0 && (
+              <button
+                type="button"
+                onClick={handleCerrarTodas}
+                disabled={cerrandoTodas}
+                className="text-[10.5px] font-bold text-red-600 hover:text-red-700 hover:bg-red-50 px-2 py-0.5 rounded-lg border border-red-200 transition-colors cursor-pointer disabled:opacity-50"
+              >
+                {cerrandoTodas ? 'Desconectando...' : 'Cerrar todas las sesiones'}
+              </button>
+            )}
           </div>
 
           {/* Listado de sesiones */}
@@ -156,22 +176,16 @@ export default function ModalDispositivosConectados({
                       </div>
                     </div>
 
-                    {!s.esActual ? (
-                      <button
-                        type="button"
-                        onClick={() => handleCerrarRemoto(s.id, s.dispositivo || 'dispositivo')}
-                        disabled={cerrandoId === s.id}
-                        className="px-2.5 py-1.5 text-[11px] font-semibold text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg transition-colors flex items-center gap-1 shrink-0 cursor-pointer disabled:opacity-50"
-                        title="Desconectar este dispositivo inmediatamente"
-                      >
-                        <LogOut size={12} />
-                        <span>{cerrandoId === s.id ? 'Cerrando...' : 'Cerrar sesión'}</span>
-                      </button>
-                    ) : (
-                      <span className="text-[10px] font-medium text-emerald-700 bg-emerald-50 px-2 py-1 rounded-md border border-emerald-200 shrink-0">
-                        Sesión Actual
-                      </span>
-                    )}
+                    <button
+                      type="button"
+                      onClick={() => handleCerrarRemoto(s.id, s.dispositivo || 'dispositivo')}
+                      disabled={cerrandoId === s.id}
+                      className="px-2.5 py-1.5 text-[11px] font-semibold text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg transition-colors flex items-center gap-1 shrink-0 cursor-pointer disabled:opacity-50"
+                      title="Cerrar la sesión de este dispositivo inmediatamente"
+                    >
+                      <LogOut size={12} />
+                      <span>{cerrandoId === s.id ? 'Cerrando...' : 'Cerrar sesión'}</span>
+                    </button>
                   </div>
                 );
               })
