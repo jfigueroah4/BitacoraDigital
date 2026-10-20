@@ -44,6 +44,7 @@ const USUARIOS_BASE: Usuario[] = [
     rol: 'Administrador',
     estado: 'Activo',
     cargo: 'Administrador de Proyecto',
+    telefono: '+502 56252922',
     fechaCreacion: '2026-01-15',
     ultimoAcceso: 'Sin accesos todavía',
     contadorAccesos: 0,
@@ -54,11 +55,12 @@ const USUARIOS_BASE: Usuario[] = [
     primer_nombre: 'Alejandra',
     primer_apellido: 'De León',
     username: 'ADELEON',
-    nombre: 'Alejandra De León',
+    nombre: 'Ing. Alejandra De León',
     correo: 'adeleon@prodecsa.com.gt',
     rol: 'Usuario',
     estado: 'Activo',
     cargo: 'Ingeniera de Proyecto (PRODECSA)',
+    telefono: '+502 5555 9901',
     fechaCreacion: '2026-02-01',
     ultimoAcceso: 'Sin accesos todavía',
     contadorAccesos: 0,
@@ -69,11 +71,12 @@ const USUARIOS_BASE: Usuario[] = [
     primer_nombre: 'Jorge',
     primer_apellido: 'Zambrano',
     username: 'JZAMBRANO',
-    nombre: 'Jorge Zambrano',
+    nombre: 'Ing. Jorge Zambrano',
     correo: 'ingenieria01zambrano@gipsa.gt',
     rol: 'Usuario',
     estado: 'Activo',
     cargo: 'Ingeniero de Proyecto (GIPSA)',
+    telefono: '+502 5555 9902',
     fechaCreacion: '2026-02-01',
     ultimoAcceso: 'Sin accesos todavía',
     contadorAccesos: 0,
@@ -84,11 +87,12 @@ const USUARIOS_BASE: Usuario[] = [
     primer_nombre: 'Sharlyn',
     primer_apellido: 'López',
     username: 'SLOPEZ',
-    nombre: 'Sharlyn López',
+    nombre: 'Ing. Sharlyn López',
     correo: 'slopez@prodecsa.com.gt',
     rol: 'Usuario',
     estado: 'Activo',
     cargo: 'Ingeniera de Proyecto (PRODECSA)',
+    telefono: '+502 5555 9903',
     fechaCreacion: '2026-02-01',
     ultimoAcceso: 'Sin accesos todavía',
     contadorAccesos: 0,
@@ -99,11 +103,12 @@ const USUARIOS_BASE: Usuario[] = [
     primer_nombre: 'Vinicio',
     primer_apellido: 'Barrios',
     username: 'VBARRIOS',
-    nombre: 'Vinicio Barrios',
+    nombre: 'Ing. Vinicio Barrios',
     correo: 'jadquisiciones@gipsa.gt',
     rol: 'Usuario',
     estado: 'Activo',
     cargo: 'Ingeniero de Adquisiciones (GIPSA)',
+    telefono: '+502 5555 9904',
     fechaCreacion: '2026-02-01',
     ultimoAcceso: 'Sin accesos todavía',
     contadorAccesos: 0,
@@ -114,11 +119,12 @@ const USUARIOS_BASE: Usuario[] = [
     primer_nombre: 'Hugo',
     primer_apellido: 'Fuentes',
     username: 'HFUENTES',
-    nombre: 'Hugo Fuentes',
+    nombre: 'Ing. Hugo Fuentes',
     correo: 'hfuentes@domun.com.gt',
     rol: 'Usuario',
     estado: 'Activo',
     cargo: 'Ingeniero de Proyecto (DOMUN)',
+    telefono: '+502 5555 9905',
     fechaCreacion: '2026-02-01',
     ultimoAcceso: 'Sin accesos todavía',
     contadorAccesos: 0,
@@ -129,11 +135,12 @@ const USUARIOS_BASE: Usuario[] = [
     primer_nombre: 'Raúl',
     primer_apellido: 'Alvarado',
     username: 'RALVARADO',
-    nombre: 'Raúl Alvarado',
+    nombre: 'Ing. Raúl Alvarado',
     correo: 'tektonconsultores@yahoo.com',
     rol: 'Usuario',
     estado: 'Activo',
     cargo: 'Ingeniero de Proyecto (DOMUN)',
+    telefono: '+502 5555 9906',
     fechaCreacion: '2026-02-01',
     ultimoAcceso: 'Sin accesos todavía',
     contadorAccesos: 0,
@@ -144,11 +151,12 @@ const USUARIOS_BASE: Usuario[] = [
     primer_nombre: 'José',
     primer_apellido: 'Aldana',
     username: 'JALDANA',
-    nombre: 'José Aldana',
+    nombre: 'Ing. José Aldana',
     correo: 'jaldana@vasguatemala.com',
     rol: 'Usuario',
     estado: 'Activo',
     cargo: 'Ingeniero de Proyecto (SACBE)',
+    telefono: '+502 5555 9907',
     fechaCreacion: '2026-02-01',
     ultimoAcceso: 'Sin accesos todavía',
     contadorAccesos: 0,
@@ -159,11 +167,12 @@ const USUARIOS_BASE: Usuario[] = [
     primer_nombre: 'Álvaro',
     primer_apellido: 'Guillermo',
     username: 'AGUILLERMO',
-    nombre: 'Álvaro Guillermo',
+    nombre: 'Ing. Álvaro Guillermo',
     correo: 'aguillermo@vasguatemala.com',
     rol: 'Usuario',
     estado: 'Activo',
     cargo: 'Ingeniero de Proyecto (SACBE)',
+    telefono: '+502 5555 9908',
     fechaCreacion: '2026-02-01',
     ultimoAcceso: 'Sin accesos todavía',
     contadorAccesos: 0,
@@ -214,125 +223,87 @@ export default function UsuariosPage() {
   const [modalDispositivosOpen, setModalDispositivosOpen] = useState(false);
   const [usuarioDispositivos, setUsuarioDispositivos] = useState<Usuario | undefined>();
 
-  // Cargar usuarios de Supabase, API y localStorage asegurando persistencia completa
+    // Cargar usuarios de Supabase Storage, API y BD asegurando sincronización completa
   const cargarUsuarios = useCallback(async () => {
     try {
       setLoading(true);
 
-      // 1. Obtener usuarios locales existentes en localStorage (creados por el administrador)
-      let usuariosLocales: Usuario[] = [];
+      let usuariosObtenidos: Usuario[] = [];
+
+      // 1. Obtener de API backend (/api/usuarios) sincronizada con Supabase Storage
       try {
-        const stored = localStorage.getItem('bitacora_usuarios_lista');
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          if (Array.isArray(parsed)) {
-            usuariosLocales = parsed;
+        const res = await fetch(`/api/usuarios?t=${Date.now()}`, { cache: 'no-store' });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && Array.isArray(data.usuarios) && data.usuarios.length > 0) {
+            usuariosObtenidos = data.usuarios;
           }
         }
-      } catch (_) {}
+      } catch (errApi) {
+        console.warn('Error cargando de API /usuarios:', errApi);
+      }
 
-      let mapeados: Usuario[] = [];
-
-      // 2. Intentar cargar desde Supabase DB o API
-      if (supabase) {
+      // 2. Si no hay usuarios de la API, consultar Supabase DB directamente
+      if (usuariosObtenidos.length === 0 && supabase) {
         try {
           const { data, error } = await supabase
             .from('perfil_usuario')
             .select('*, usuario(*, rol(*))');
 
           if (!error && data && data.length > 0) {
-            mapeados = data.map((item: any) => {
+            usuariosObtenidos = data.map((item: any) => {
               const pNombre = item.primer_nombre || (item.nombre_completo ? item.nombre_completo.split(' ')[0] : 'Usuario');
               const pApellido = item.primer_apellido || (item.nombre_completo ? item.nombre_completo.split(' ').slice(1).join(' ') : '');
+              const uName = (item.username || item.usuario?.username || `${pNombre[0] || ''}${pApellido || ''}`).toUpperCase().replace(/[^A-Z0-9._]/g, '');
+              const rolName = item.usuario?.rol?.nombre_rol || item.rol || 'Usuario';
               return {
                 id: item.usuario_id || item.id,
                 primer_nombre: pNombre,
                 primer_apellido: pApellido,
-                username: item.username || item.usuario?.username || `${pNombre[0] || ''}${pApellido || ''}`.toLowerCase().replace(/[^a-z0-9._]/g, ''),
+                username: uName,
                 nombre: item.nombre_completo || `${pNombre} ${pApellido}`.trim(),
-                correo: item.usuario?.correo || item.correo || 'usuario@bitacoradigital.com',
-                rol: item.usuario?.rol?.nombre_rol || item.rol || 'Usuario',
-                estado: (item.usuario?.estado || 'Activo') as EstadoUsuario,
+                correo: item.usuario?.correo || item.correo || '',
+                rol: rolName === 'Administrador' ? 'Administrador' : 'Usuario',
+                estado: (item.estado || item.usuario?.estado || 'Activo') as EstadoUsuario,
                 cargo: item.cargo_puesto || 'Colaborador',
                 telefono: item.telefono || '',
-                fechaCreacion: item.created_at ? item.created_at.slice(0, 10) : '2026-01-01',
+                fechaCreacion: item.created_at ? item.created_at.slice(0, 10) : '2026-02-01',
                 direccion: item.direccion || '',
+                ultimoAcceso: 'Sin accesos todavía',
+                contadorAccesos: 0,
+                password: 'VAS-HINCAPIE',
               };
             });
           }
         } catch (_) {}
       }
 
-      // 3. Fusión con prioridad absoluta a usuarios locales para conservar roles (ej. Administrador),
-      // nombres reales, números telefónicos y datos sin que sean sobreescritos por datos genéricos de DB
-      const emailsVistos = new Set<string>();
-      const usernamesVistos = new Set<string>();
-      const combinados: Usuario[] = [];
+      // 3. Si aún no hay usuarios, usar USUARIOS_BASE
+      if (usuariosObtenidos.length === 0) {
+        usuariosObtenidos = USUARIOS_BASE;
+      }
 
-      // A) Usuarios locales guardados por el admin (PRIORIDAD MÁXIMA)
-      usuariosLocales.forEach((u) => {
-        const emailKey = u.correo?.trim().toLowerCase();
-        const userKey = u.username?.trim().toLowerCase();
-        if (emailKey && !emailsVistos.has(emailKey) && (!userKey || !usernamesVistos.has(userKey))) {
-          emailsVistos.add(emailKey);
-          if (userKey) usernamesVistos.add(userKey);
-          combinados.push(u);
-        }
-      });
-
-      // B) Usuarios remotos de DB que no estén ya registrados localmente
-      mapeados.forEach((u) => {
-        const emailKey = u.correo?.trim().toLowerCase();
-        const userKey = u.username?.trim().toLowerCase();
-        if (emailKey && !emailsVistos.has(emailKey) && (!userKey || !usernamesVistos.has(userKey))) {
-          emailsVistos.add(emailKey);
-          if (userKey) usernamesVistos.add(userKey);
-          combinados.push(u);
-        }
-      });
-
-      // C) Usuarios base (solo Daniel Figueroa @dfigueroa)
-      USUARIOS_BASE.forEach((u) => {
-        const emailKey = u.correo?.trim().toLowerCase();
-        const userKey = u.username?.trim().toLowerCase();
-        if (emailKey && !emailsVistos.has(emailKey) && (!userKey || !usernamesVistos.has(userKey))) {
-          emailsVistos.add(emailKey);
-          if (userKey) usernamesVistos.add(userKey);
-          combinados.push(u);
-        }
-      });
-
-      // D) FILTRADO ESTRICTO: Eliminar permanentemente todos los usuarios de prueba/demo antiguos solicitados
-      const usuariosLimpios = combinados.filter((u) => {
-        const un = (u.username || '').toLowerCase();
+      // Filtrar solo usuarios de prueba o borrados explícitos
+      const filtrados = usuariosObtenidos.filter((u) => {
         const em = (u.correo || '').toLowerCase();
-        // Preservar siempre a dfigueroa (Administrador)
-        if (un === 'dfigueroa' || (u.username || '').toUpperCase() === 'DFIGUEROA' || un === 'danielfigueroa' || em === 'admin@bitacoradigital.com') {
-          return true;
-        }
-        // Descartar cuentas de prueba o usuarios demo que deben desaparecer
+        const un = (u.username || '').toLowerCase();
         if (
-          un === 'cusuario' ||
-          un === 'jusuario' ||
-          un.startsWith('jfigueroa') ||
-          un === 'mariotzul' ||
-          un === 'raulalvarado' ||
-          un === 'usuario' ||
-          un === 'residente' ||
+          em === 'jfigueroah4@miug.edu.gt' ||
+          em === 'cfigueroaa@gmail.com' ||
+          em === 'mario.tzul@bitacoradigital.com' ||
           em === 'usuario@bitacoradigital.com' ||
           em === 'residente@bitacoradigital.com' ||
-          em === 'mario.tzul@bitacoradigital.com' ||
-          em === 'cfigueroaa@gmail.com' ||
-          em === 'jafm911@gmail.com' ||
-          em.includes('@bitacoradigital.csom')
+          un === 'cusuario' ||
+          un === 'jusuario' ||
+          un === 'mariotzul'
         ) {
           return false;
         }
         return true;
       });
 
-      setUsuarios(usuariosLimpios);
-      localStorage.setItem('bitacora_usuarios_lista', JSON.stringify(usuariosLimpios));
+      setUsuarios(filtrados);
+      localStorage.setItem('bitacora_usuarios_lista', JSON.stringify(filtrados));
     } catch (_) {
       const stored = localStorage.getItem('bitacora_usuarios_lista');
       if (stored) {
@@ -466,7 +437,7 @@ export default function UsuariosPage() {
   const handleVer = (usuario: Usuario) => abrirDrawer('view', usuario);
   const handleEditar = (usuario: Usuario) => abrirDrawer('edit', usuario);
 
-  const handleGuardarUsuario = async (payload: any) => {
+    const handleGuardarUsuario = async (payload: any) => {
     try {
       const pNombre = formatearNombrePropio(payload.primer_nombre);
       const sNombre = payload.segundo_nombre ? formatearNombrePropio(payload.segundo_nombre) : '';
@@ -480,7 +451,7 @@ export default function UsuariosPage() {
       const telClean = finalTelefono.replace(/[^0-9]/g, '');
       const finalRol = payload.rol || 'Usuario';
 
-      // 1. Validar unicidad estricta (correo, username, teléfono)
+      // 1. Validar unicidad (correo, username, teléfono)
       const dupEmail = usuarios.some((u) => {
         if (drawerMode === 'edit' && usuarioActivo && u.id === usuarioActivo.id) return false;
         return u.correo && u.correo.trim().toLowerCase() === finalEmail;
@@ -512,7 +483,44 @@ export default function UsuariosPage() {
       }
 
       if (drawerMode === 'edit' && usuarioActivo) {
-        // Actualizar existente
+        // Actualizar existente vía API backend
+        try {
+          const res = await fetch('/api/usuarios', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              id: usuarioActivo.id,
+              primer_nombre: pNombre,
+              segundo_nombre: sNombre || null,
+              primer_apellido: pApellido,
+              segundo_apellido: sApellido || null,
+              username: finalUsername,
+              nombre: nombreCompleto,
+              correo: finalEmail,
+              telefono: finalTelefono,
+              rol: finalRol,
+              estado: payload.estado || usuarioActivo.estado,
+              cargo: payload.cargo || usuarioActivo.cargo,
+              direccion: payload.direccion || null,
+              password: payload.password ? payload.password.trim() : undefined,
+            }),
+          });
+          if (res.ok) {
+            const data = await res.json();
+            if (data.success && data.usuario) {
+              const actualizados = usuarios.map((u) => (u.id === usuarioActivo.id ? { ...u, ...data.usuario } : u));
+              setUsuarios(actualizados);
+              localStorage.setItem('bitacora_usuarios_lista', JSON.stringify(actualizados));
+              showSuccessToast('Usuario actualizado exitosamente');
+              setDrawerOpen(false);
+              setUsuarioActivo(undefined);
+              return;
+            }
+          }
+        } catch (errApi) {
+          console.warn('Error en PUT /api/usuarios:', errApi);
+        }
+
         const actualizados = usuarios.map((u) => {
           if (u.id === usuarioActivo.id) {
             return {
@@ -529,7 +537,7 @@ export default function UsuariosPage() {
               estado: payload.estado || u.estado,
               cargo: payload.cargo || u.cargo,
               direccion: payload.direccion || null,
-              password: payload.password ? payload.password.trim().toUpperCase() : u.password,
+              password: payload.password ? payload.password.trim() : u.password,
             };
           }
           return u;
@@ -537,27 +545,10 @@ export default function UsuariosPage() {
 
         setUsuarios(actualizados);
         localStorage.setItem('bitacora_usuarios_lista', JSON.stringify(actualizados));
-
-        // Actualizar en Supabase si es posible
-        if (supabase && usuarioActivo.id) {
-          try {
-            await supabase.from('perfil_usuario').update({
-              nombre_completo: nombreCompleto,
-              primer_nombre: pNombre,
-              primer_apellido: pApellido,
-              cargo_puesto: payload.cargo,
-              telefono: finalTelefono,
-              correo: finalEmail,
-            }).eq('usuario_id', usuarioActivo.id);
-          } catch (_) {}
-        }
-
         showSuccessToast('Usuario actualizado exitosamente');
       } else {
-        // Crear nuevo con ID único garantizado
-        let newId = `usr-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
-
-        // Intentar registrar mediante API backend con Service Role
+        // Crear nuevo con API backend
+        let nuevoUserCreado: Usuario | null = null;
         try {
           const res = await fetch('/api/usuarios', {
             method: 'POST',
@@ -567,21 +558,21 @@ export default function UsuariosPage() {
               username: finalUsername,
               correo: finalEmail,
               rol: finalRol,
-              password: payload.password ? payload.password.trim().toUpperCase() : undefined,
+              password: payload.password ? payload.password.trim() : 'VAS-HINCAPIE',
             }),
           });
           if (res.ok) {
             const data = await res.json();
-            if (data?.usuario?.id && !usuarios.some(u => u.id === data.usuario.id)) {
-              newId = data.usuario.id;
+            if (data.success && data.usuario) {
+              nuevoUserCreado = data.usuario;
             }
           }
-        } catch (apiErr) {
-          console.warn('Registro offline/local:', apiErr);
+        } catch (errApi) {
+          console.warn('Error en POST /api/usuarios:', errApi);
         }
 
-        const nuevoUserObj: Usuario = {
-          id: newId,
+        const nuevoUserObj: Usuario = nuevoUserCreado || {
+          id: `usr-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
           primer_nombre: pNombre,
           segundo_nombre: sNombre || null,
           primer_apellido: pApellido,
@@ -590,17 +581,16 @@ export default function UsuariosPage() {
           nombre: nombreCompleto,
           correo: finalEmail,
           telefono: finalTelefono,
+          cargo: payload.cargo || 'Colaborador',
           rol: finalRol,
           estado: payload.estado || 'Activo',
-          cargo: payload.cargo,
           direccion: payload.direccion || null,
-          password: payload.password ? payload.password.trim().toUpperCase() : undefined,
           fechaCreacion: new Date().toISOString().slice(0, 10),
           ultimoAcceso: 'Sin accesos todavía',
           contadorAccesos: 0,
+          password: payload.password || 'VAS-HINCAPIE',
         };
 
-        // Guardar sin duplicar
         const sinDuplicados = usuarios.filter((u) => u.correo.toLowerCase() !== finalEmail && u.username?.toUpperCase() !== finalUsername);
         const actualizados = [nuevoUserObj, ...sinDuplicados];
         setUsuarios(actualizados);
@@ -624,16 +614,34 @@ export default function UsuariosPage() {
     setDeleteOpen(true);
   };
 
-  const handleConfirmarAccion = (accion: 'eliminar' | 'suspender' | 'activar') => {
+    const handleConfirmarAccion = async (accion: 'eliminar' | 'suspender' | 'activar') => {
     if (!usuarioEliminar) return;
 
     if (accion === 'eliminar') {
+      try {
+        await fetch(`/api/usuarios?id=${encodeURIComponent(usuarioEliminar.id)}&email=${encodeURIComponent(usuarioEliminar.correo)}`, {
+          method: 'DELETE',
+        });
+      } catch (_) {}
+
       limpiarSesionesUsuario(usuarioEliminar.correo);
       const actualizados = usuarios.filter((u) => u.id !== usuarioEliminar.id);
       setUsuarios(actualizados);
       localStorage.setItem('bitacora_usuarios_lista', JSON.stringify(actualizados));
       showSuccessToast('Usuario eliminado definitivamente');
     } else if (accion === 'suspender') {
+      try {
+        await fetch('/api/usuarios', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: usuarioEliminar.id,
+            correo: usuarioEliminar.correo,
+            estado: 'Suspendido',
+          }),
+        });
+      } catch (_) {}
+
       limpiarSesionesUsuario(usuarioEliminar.correo);
       const actualizados = usuarios.map((u) => {
         if (u.id === usuarioEliminar.id) {
@@ -649,6 +657,18 @@ export default function UsuariosPage() {
       localStorage.setItem('bitacora_usuarios_lista', JSON.stringify(actualizados));
       showSuccessToast('Usuario suspendido exitosamente. No podrá acceder al sistema.');
     } else {
+      try {
+        await fetch('/api/usuarios', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: usuarioEliminar.id,
+            correo: usuarioEliminar.correo,
+            estado: 'Activo',
+          }),
+        });
+      } catch (_) {}
+
       const actualizados = usuarios.map((u) => {
         if (u.id === usuarioEliminar.id) {
           return {

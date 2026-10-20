@@ -132,10 +132,40 @@ export default function LoginPage() {
         admin: { email: 'admin@bitacoradigital.com', nombre: 'Daniel Figueroa', rol: 'Administrador', cargo: 'Administrador de Proyecto' },
         dfigueroa: { email: 'admin@bitacoradigital.com', nombre: 'Daniel Figueroa', rol: 'Administrador', cargo: 'Administrador de Proyecto' },
         danielfigueroa: { email: 'admin@bitacoradigital.com', nombre: 'Daniel Figueroa', rol: 'Administrador', cargo: 'Administrador de Proyecto' },
+        jfigueroa: { email: 'jafm911@gmail.com', nombre: 'Jorge Figueroa', rol: 'Administrador', cargo: 'Administrador de Proyecto' },
+        jorgefigueroa: { email: 'jafm911@gmail.com', nombre: 'Jorge Figueroa', rol: 'Administrador', cargo: 'Administrador de Proyecto' },
+        adeleon: { email: 'adeleon@prodecsa.com.gt', nombre: 'Ing. Alejandra De León', rol: 'Usuario', cargo: 'Ingeniera de Proyecto (PRODECSA)' },
+        jzambrano: { email: 'ingenieria01zambrano@gipsa.gt', nombre: 'Ing. Jorge Zambrano', rol: 'Usuario', cargo: 'Ingeniero de Proyecto (GIPSA)' },
+        slopez: { email: 'slopez@prodecsa.com.gt', nombre: 'Ing. Sharlyn López', rol: 'Usuario', cargo: 'Ingeniera de Proyecto (PRODECSA)' },
+        vbarrios: { email: 'jadquisiciones@gipsa.gt', nombre: 'Ing. Vinicio Barrios', rol: 'Usuario', cargo: 'Ingeniero de Adquisiciones (GIPSA)' },
+        hfuentes: { email: 'hfuentes@domun.com.gt', nombre: 'Ing. Hugo Fuentes', rol: 'Usuario', cargo: 'Ingeniero de Proyecto (DOMUN)' },
+        ralvarado: { email: 'tektonconsultores@yahoo.com', nombre: 'Ing. Raúl Alvarado', rol: 'Usuario', cargo: 'Ingeniero de Proyecto (DOMUN)' },
+        jaldana: { email: 'jaldana@vasguatemala.com', nombre: 'Ing. José Aldana', rol: 'Usuario', cargo: 'Ingeniero de Proyecto (SACBE)' },
+        aguillermo: { email: 'aguillermo@vasguatemala.com', nombre: 'Ing. Álvaro Guillermo', rol: 'Usuario', cargo: 'Ingeniero de Proyecto (SACBE)' },
       };
 
       if (!emailParaAuth && usuariosBaseMap[cleanUser]) {
         emailParaAuth = usuariosBaseMap[cleanUser].email;
+      }
+
+      // Si no se encontró en mapa base, consultar API /usuarios para soportar cualquier usuario dinámico
+      if (!emailParaAuth && !userTrim.includes('@')) {
+        try {
+          const res = await fetch(`/api/usuarios?t=${Date.now()}`, { cache: 'no-store' });
+          if (res.ok) {
+            const data = await res.json();
+            if (data.success && Array.isArray(data.usuarios)) {
+              const match = data.usuarios.find(
+                (u: any) =>
+                  (u.username && u.username.toLowerCase() === cleanUser) ||
+                  (u.correo && u.correo.toLowerCase() === userTrim)
+              );
+              if (match?.correo) {
+                emailParaAuth = match.correo.toLowerCase();
+              }
+            }
+          }
+        } catch (_) {}
       }
 
       // Buscar si el texto ingresado corresponde al username de un usuario guardado

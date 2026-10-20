@@ -22,6 +22,7 @@ import { UserProfile } from '@/types/bitacora';
 import { MESES_NOMBRES } from '@/lib/mockData';
 import { showSuccessToast } from '@/components/ui/Toast';
 import ModalDispositivosConectados from '@/components/modals/ModalDispositivosConectados';
+import { getOrCreateDeviceId } from '@/lib/services/sesiones';
 
 interface TopBarProps {
   searchQuery?: string;
@@ -168,6 +169,32 @@ export default function TopBar({
   useEffect(() => {
     setInternalQuery(searchQuery);
   }, [searchQuery]);
+
+  // Verificación reactiva de sesión activa en vivo (cierra sesión remota si un admin o el usuario la desconectó)
+  useEffect(() => {
+    if (!currentUser?.email) return;
+
+    const verificarSesionViva = async () => {
+      try {
+        const deviceId = getOrCreateDeviceId();
+        const res = await fetch(`/api/sesiones?correo=${encodeURIComponent(currentUser.email)}&t=${Date.now()}`, { cache: 'no-store' });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && Array.isArray(data.sesiones) && data.sesiones.length > 0) {
+            const miSesionExiste = data.sesiones.some((s: any) => s.id === deviceId);
+            if (!miSesionExiste) {
+              localStorage.removeItem('bitacora_user_profile');
+              localStorage.removeItem('bitacora_sesiones_activas');
+              router.push('/login?motivo=sesion_cerrada');
+            }
+          }
+        }
+      } catch (_) {}
+    };
+
+    const interval = setInterval(verificarSesionViva, 12000);
+    return () => clearInterval(interval);
+  }, [currentUser?.email, router]);
 
   useEffect(() => {
     if (userProfile) {

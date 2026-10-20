@@ -45,7 +45,7 @@ export function detectarDispositivoCliente(): string {
 }
 
 /**
- * Obtiene todas las sesiones activas en el sistema
+ * Obtiene todas las sesiones activas en el sistema desde localStorage
  */
 function getTodasLasSesiones(): DispositivoSesion[] {
   if (typeof window === 'undefined') return [];
@@ -60,7 +60,7 @@ function getTodasLasSesiones(): DispositivoSesion[] {
 }
 
 /**
- * Guarda el listado global de sesiones activas
+ * Guarda el listado global de sesiones activas en localStorage
  */
 function guardarTodasLasSesiones(sesiones: DispositivoSesion[]): void {
   if (typeof window === 'undefined') return;
@@ -89,25 +89,48 @@ export function obtenerSesionesUsuario(correo: string): DispositivoSesion[] {
 }
 
 /**
+ * Obtiene las sesiones activas sincronizadas con el servidor
+ */
+export async function sincronizarSesionesServidor(correo?: string): Promise<DispositivoSesion[]> {
+  try {
+    const url = correo ? `/api/sesiones?correo=${encodeURIComponent(correo)}` : '/api/sesiones';
+    const res = await fetch(url, { cache: 'no-store' });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success && Array.isArray(data.sesiones)) {
+        if (!correo) {
+          guardarTodasLasSesiones(data.sesiones);
+        }
+        const currentDeviceId = getOrCreateDeviceId();
+        return data.sesiones.map((s: any) => ({
+          ...s,
+          esActual: s.id === currentDeviceId,
+        }));
+      }
+    }
+  } catch (_) {}
+  return correo ? obtenerSesionesUsuario(correo) : getTodasLasSesiones();
+}
+
+/**
  * Registra o renueva la sesión del dispositivo actual para el usuario logueado
  */
 export function registrarSesionDispositivo(usuario: {
   id: string;
   email: string;
+  nombre?: string;
 }): { success: boolean; sesiones: DispositivoSesion[]; limiteAlcanzado?: boolean } {
   const correoLower = (usuario.email || '').trim().toLowerCase();
   const currentDeviceId = getOrCreateDeviceId();
   const dispositivoNombre = detectarDispositivoCliente();
   const todas = getTodasLasSesiones();
 
-  // Filtrar sesiones existentes del usuario
   const otrasDeEsteUsuario = todas.filter(
     (s) => s.usuarioCorreo && s.usuarioCorreo.toLowerCase() === correoLower
   );
 
   const yaExisteEnEsteDispositivo = otrasDeEsteUsuario.some((s) => s.id === currentDeviceId);
 
-  // Si no está registrado en este equipo y ya tiene el máximo permitido (2)
   if (!yaExisteEnEsteDispositivo && otrasDeEsteUsuario.length >= MAX_DISPOSITIVOS_PERMITIDOS) {
     return {
       success: false,
@@ -119,7 +142,6 @@ export function registrarSesionDispositivo(usuario: {
     };
   }
 
-  // Actualizar o registrar este equipo
   const sesionActual: DispositivoSesion = {
     id: currentDeviceId,
     usuarioId: usuario.id,
@@ -134,7 +156,6 @@ export function registrarSesionDispositivo(usuario: {
     (s) => !(s.usuarioCorreo?.toLowerCase() === correoLower && s.id === currentDeviceId)
   );
 
-  // Si tras filtrar aún tiene más de 1 dispositivo remoto, conservar solo el más reciente
   const remotasDelUsuario = filtradas.filter(
     (s) => s.usuarioCorreo?.toLowerCase() === correoLower
   );
@@ -149,6 +170,20 @@ export function registrarSesionDispositivo(usuario: {
 
   const nuevasSesiones = [...sinEsteUsuario, ...remotasAceptadas, sesionActual];
   guardarTodasLasSesiones(nuevasSesiones);
+
+  // Sincronizar en background con API del servidor
+  try {
+    fetch('/api/sesiones', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: currentDeviceId,
+        usuarioCorreo: correoLower,
+        usuarioNombre: usuario.nombre || 'Usuario',
+        dispositivo: dispositivoNombre,
+      }),
+    }).catch(() => {});
+  } catch (_) {}
 
   return {
     success: true,
@@ -171,6 +206,10 @@ export function cerrarSesionDispositivo(correo: string, deviceIdACerrar: string)
   );
 
   guardarTodasLasSesiones(actualizadas);
+
+  try {
+    fetch(`/api/sesiones?id=${encodeURIComponent(deviceIdACerrar)}`, { method: 'DELETE' }).catch(() => {});
+  } catch (_) {}
 }
 
 /**
@@ -188,6 +227,10 @@ export function cerrarTodasSesionesRemotas(correo: string, conservarActual: bool
   });
 
   guardarTodasLasSesiones(actualizadas);
+
+  try {
+    fetch(`/api/sesiones?correo=${encodeURIComponent(correoLower)}`, { method: 'DELETE' }).catch(() => {});
+  } catch (_) {}
 }
 
 /**
@@ -201,6 +244,10 @@ export function limpiarSesionesUsuario(correo: string): void {
     (s) => s.usuarioCorreo?.toLowerCase() !== correoLower
   );
   guardarTodasLasSesiones(actualizadas);
+
+  try {
+    fetch(`/api/sesiones?correo=${encodeURIComponent(correoLower)}`, { method: 'DELETE' }).catch(() => {});
+  } catch (_) {}
 }
 
 /**

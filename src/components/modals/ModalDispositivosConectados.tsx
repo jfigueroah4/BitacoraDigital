@@ -5,6 +5,7 @@ import { X, Laptop, Smartphone, LogOut, CheckCircle2, Shield, AlertTriangle } fr
 import { DispositivoSesion } from '@/types/usuario';
 import {
   obtenerSesionesUsuario,
+  sincronizarSesionesServidor,
   cerrarSesionDispositivo,
   MAX_DISPOSITIVOS_PERMITIDOS,
 } from '@/lib/services/sesiones';
@@ -28,10 +29,19 @@ export default function ModalDispositivosConectados({
   const [sesiones, setSesiones] = useState<DispositivoSesion[]>([]);
   const [cerrandoId, setCerrandoId] = useState<string | null>(null);
 
-  const cargarSesiones = () => {
+  const cargarSesiones = async () => {
     if (!usuarioCorreo) return;
-    const items = obtenerSesionesUsuario(usuarioCorreo);
-    setSesiones(items);
+    // Carga rápida local
+    const local = obtenerSesionesUsuario(usuarioCorreo);
+    setSesiones(local);
+
+    // Sincronización en vivo desde servidor
+    try {
+      const servidor = await sincronizarSesionesServidor(usuarioCorreo);
+      if (servidor && servidor.length > 0) {
+        setSesiones(servidor);
+      }
+    } catch (_) {}
   };
 
   useEffect(() => {
@@ -42,15 +52,13 @@ export default function ModalDispositivosConectados({
 
   if (!isOpen) return null;
 
-  const handleCerrarRemoto = (deviceId: string, nombreDispositivo: string) => {
+  const handleCerrarRemoto = async (deviceId: string, nombreDispositivo: string) => {
     setCerrandoId(deviceId);
-    setTimeout(() => {
-      cerrarSesionDispositivo(usuarioCorreo, deviceId);
-      cargarSesiones();
-      setCerrandoId(null);
-      showSuccessToast(`Sesión cerrada correctamente en ${nombreDispositivo}.`);
-      onSesionCerrada?.();
-    }, 200);
+    cerrarSesionDispositivo(usuarioCorreo, deviceId);
+    showSuccessToast(`Sesión cerrada correctamente en ${nombreDispositivo}.`);
+    await cargarSesiones();
+    setCerrandoId(null);
+    onSesionCerrada?.();
   };
 
   return (
@@ -98,97 +106,90 @@ export default function ModalDispositivosConectados({
             </span>
           </div>
 
-          {/* Listado de dispositivos */}
-          <div className="space-y-2.5 max-h-[300px] overflow-y-auto">
-            {sesiones.length > 0 ? (
-              sesiones.map((sesion, idx) => {
+          {/* Listado de sesiones */}
+          <div className="space-y-2.5 max-h-[300px] overflow-y-auto pr-1">
+            {sesiones.length === 0 ? (
+              <div className="text-center py-6 text-gray-400 text-xs bg-gray-50/60 rounded-xl border border-dashed border-gray-200">
+                No hay sesiones activas registradas para esta cuenta.
+              </div>
+            ) : (
+              sesiones.map((s, index) => {
                 const esMovil =
-                  sesion.dispositivo?.toLowerCase().includes('iphone') ||
-                  sesion.dispositivo?.toLowerCase().includes('android') ||
-                  sesion.dispositivo?.toLowerCase().includes('ipad');
-
-                const fechaFormateada = sesion.fechaHora
-                  ? new Date(sesion.fechaHora).toLocaleDateString([], {
-                      day: '2-digit',
-                      month: 'short',
-                      year: 'numeric',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })
-                  : 'Recientemente';
+                  s.dispositivo?.toLowerCase().includes('phone') ||
+                  s.dispositivo?.toLowerCase().includes('android');
+                const IconoDispositivo = esMovil ? Smartphone : Laptop;
 
                 return (
                   <div
-                    key={sesion.id || idx}
-                    className="flex items-center justify-between gap-3 p-3 rounded-xl border border-gray-200 bg-white hover:border-gray-300 transition-all shadow-2xs"
+                    key={s.id || index}
+                    className={`p-3 rounded-xl border transition-all flex items-center justify-between gap-3 ${
+                      s.esActual
+                        ? 'bg-emerald-50/40 border-emerald-200'
+                        : 'bg-white border-gray-200 hover:border-gray-300'
+                    }`}
                   >
                     <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-9 h-9 rounded-xl bg-gray-100 text-gray-700 flex items-center justify-center shrink-0">
-                        {esMovil ? <Smartphone size={17} /> : <Laptop size={17} />}
+                      <div
+                        className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${
+                          s.esActual
+                            ? 'bg-emerald-100 text-emerald-700'
+                            : 'bg-gray-100 text-gray-700'
+                        }`}
+                      >
+                        <IconoDispositivo size={18} />
                       </div>
-
                       <div className="min-w-0">
                         <div className="flex items-center gap-1.5 flex-wrap">
-                          <p className="font-bold text-[12px] text-gray-900 truncate">
-                            {sesion.dispositivo || `Dispositivo ${idx + 1}`}
+                          <p className="text-xs font-bold text-gray-900 truncate">
+                            {s.dispositivo || 'Equipo Web'}
                           </p>
-                          {sesion.esActual ? (
-                            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[9px] font-bold bg-gray-100 text-gray-800 border border-gray-200">
-                              <span className="w-1.5 h-1.5 rounded-full bg-gray-600" />
-                              Este dispositivo
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-semibold bg-gray-50 text-gray-500 border border-gray-200">
-                              Remoto
+                          {s.esActual && (
+                            <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-emerald-800 bg-emerald-100 px-1.5 py-0.2 rounded-full border border-emerald-300">
+                              <CheckCircle2 size={10} /> Este dispositivo
                             </span>
                           )}
                         </div>
-
-                        <p className="text-[10px] text-gray-400 mt-0.5">
-                          Conectado: {fechaFormateada}
+                        <p className="text-[10px] text-gray-500 mt-0.5">
+                          {s.fechaHora ? new Date(s.fechaHora).toLocaleString('es-GT', { dateStyle: 'short', timeStyle: 'short' }) : 'Reciente'}
+                          {s.ip ? ` • IP: ${s.ip}` : ''}
                         </p>
                       </div>
                     </div>
 
-                    {/* Acciones */}
-                    <div className="shrink-0">
-                      {sesion.esActual ? (
-                        <span className="text-[10px] font-semibold text-gray-700 bg-gray-100 border border-gray-200 px-2.5 py-1 rounded-lg select-none">
-                          Sesión en uso
-                        </span>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => handleCerrarRemoto(sesion.id, sesion.dispositivo)}
-                          disabled={cerrandoId === sesion.id}
-                          className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg transition-colors cursor-pointer disabled:opacity-50"
-                          title="Cerrar la sesión de este otro equipo"
-                        >
-                          <LogOut size={12} />
-                          <span>{cerrandoId === sesion.id ? 'Cerrando...' : 'Cerrar sesión'}</span>
-                        </button>
-                      )}
-                    </div>
+                    {!s.esActual ? (
+                      <button
+                        type="button"
+                        onClick={() => handleCerrarRemoto(s.id, s.dispositivo || 'dispositivo')}
+                        disabled={cerrandoId === s.id}
+                        className="px-2.5 py-1.5 text-[11px] font-semibold text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg transition-colors flex items-center gap-1 shrink-0 cursor-pointer disabled:opacity-50"
+                        title="Desconectar este dispositivo inmediatamente"
+                      >
+                        <LogOut size={12} />
+                        <span>{cerrandoId === s.id ? 'Cerrando...' : 'Cerrar sesión'}</span>
+                      </button>
+                    ) : (
+                      <span className="text-[10px] font-medium text-emerald-700 bg-emerald-50 px-2 py-1 rounded-md border border-emerald-200 shrink-0">
+                        Sesión Actual
+                      </span>
+                    )}
                   </div>
                 );
               })
-            ) : (
-              <div className="p-4 text-center rounded-xl border border-dashed border-gray-200 text-gray-400 text-xs">
-                No hay sesiones adicionales registradas.
-              </div>
             )}
           </div>
 
-
-
-          {/* Footer */}
-          <div className="flex items-center justify-end pt-2 border-t border-gray-100">
+          {/* Footer Informativo */}
+          <div className="pt-2 border-t border-gray-100 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-1.5 text-[10px] text-gray-500">
+              <Shield size={12} className="text-gray-400" />
+              <span>Protección de acceso por cuenta</span>
+            </div>
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-xs font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors cursor-pointer"
+              className="px-4 py-1.5 text-xs font-bold text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors cursor-pointer"
             >
-              Cerrar
+              Entendido
             </button>
           </div>
         </div>

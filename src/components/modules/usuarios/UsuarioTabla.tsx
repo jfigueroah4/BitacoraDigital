@@ -179,7 +179,7 @@ export const UsuarioTabla = React.memo(function UsuarioTabla({
                   <span>Editar</span>
                 </button>}
 
-                {canManage && (isSelf || tieneSesiones) && (
+                {canManage && (
                   <button
                     type="button"
                     onClick={() => onGestionarDispositivos?.(usuario)}
@@ -300,7 +300,7 @@ export const UsuarioTabla = React.memo(function UsuarioTabla({
                 const esSuspendido = usuario.estado === 'Suspendido' || (usuario as any).activo === false;
                 const sesiones = obtenerSesionesUsuario(usuario.correo);
                 const tieneSesiones = sesiones.length > 0;
-                const estadoMostrado: EstadoUsuario = esSuspendido ? 'Suspendido' : (tieneSesiones ? 'Activo' : 'Inactivo');
+                const estadoMostrado: EstadoUsuario = esSuspendido ? 'Suspendido' : (usuario.estado === 'Suspendido' ? 'Suspendido' : 'Activo');
 
 
                 return (
@@ -360,7 +360,7 @@ export const UsuarioTabla = React.memo(function UsuarioTabla({
                           <Edit2 size={13} />
                         </button>}
 
-                        {canManage && (isSelf || tieneSesiones) && (
+                        {canManage && (
                           <button
                             type="button"
                             onClick={() => onGestionarDispositivos?.(usuario)}
