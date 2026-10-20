@@ -18,10 +18,10 @@ import { obtenerSesionesUsuario, limpiarSesionesUsuario } from '@/lib/services/s
 
 const USUARIOS_BASE: Usuario[] = [
   {
-    id: 'demo-admin-1',
+    id: '1f36ea33-admin-dfigueroa',
     primer_nombre: 'Daniel',
     primer_apellido: 'Figueroa',
-    username: 'danielfigueroa',
+    username: 'dfigueroa',
     nombre: 'Daniel Figueroa',
     correo: 'admin@bitacoradigital.com',
     rol: 'Administrador',
@@ -30,48 +30,8 @@ const USUARIOS_BASE: Usuario[] = [
     telefono: '+502 56252922',
     fechaCreacion: '2026-01-10',
     direccion: 'Ciudad de Guatemala',
-  },
-  {
-    id: 'demo-user-2',
-    primer_nombre: 'Jorge',
-    primer_apellido: 'Figueroa',
-    username: 'jorgefigueroa',
-    nombre: 'Jorge Figueroa',
-    correo: 'usuario@bitacoradigital.com',
-    rol: 'Usuario',
-    estado: 'Activo',
-    cargo: 'Supervisor de Obras',
-    telefono: '+502 5555 9902',
-    fechaCreacion: '2026-02-14',
-    direccion: 'Villa Nueva',
-  },
-  {
-    id: 'demo-user-3',
-    primer_nombre: 'Raúl',
-    primer_apellido: 'Alvarado',
-    username: 'raulalvarado',
-    nombre: 'Raúl Alvarado',
-    correo: 'residente@bitacoradigital.com',
-    rol: 'IngenieroResidente',
-    estado: 'Activo',
-    cargo: 'Ingeniero Residente',
-    telefono: '+502 4432 1098',
-    fechaCreacion: '2026-03-01',
-    direccion: 'Amatitlán',
-  },
-  {
-    id: 'demo-user-4',
-    primer_nombre: 'Mario',
-    primer_apellido: 'Tzul',
-    username: 'mariotzul',
-    nombre: 'Mario Tzul',
-    correo: 'mario.tzul@bitacoradigital.com',
-    rol: 'Laboratorista',
-    estado: 'Inactivo',
-    cargo: 'Laboratorista de Suelos',
-    telefono: '+502 4589 7712',
-    fechaCreacion: '2026-03-12',
-    direccion: 'San Miguel Petapa',
+    ultimoAcceso: 'Sin accesos todavía',
+    contadorAccesos: 1,
   },
 ];
 
@@ -195,7 +155,7 @@ export default function UsuariosPage() {
         }
       });
 
-      // C) Usuarios base demo que no existan aún
+      // C) Usuarios base (solo Daniel Figueroa @dfigueroa)
       USUARIOS_BASE.forEach((u) => {
         const emailKey = u.correo?.trim().toLowerCase();
         const userKey = u.username?.trim().toLowerCase();
@@ -206,8 +166,37 @@ export default function UsuariosPage() {
         }
       });
 
-      setUsuarios(combinados);
-      localStorage.setItem('bitacora_usuarios_lista', JSON.stringify(combinados));
+      // D) FILTRADO ESTRICTO: Eliminar permanentemente todos los usuarios de prueba/demo antiguos solicitados
+      const usuariosLimpios = combinados.filter((u) => {
+        const un = (u.username || '').toLowerCase();
+        const em = (u.correo || '').toLowerCase();
+        // Preservar siempre a dfigueroa (Administrador)
+        if (un === 'dfigueroa' || un === 'danielfigueroa' || em === 'admin@bitacoradigital.com') {
+          return true;
+        }
+        // Descartar cuentas de prueba o usuarios demo que deben desaparecer
+        if (
+          un === 'cusuario' ||
+          un === 'jusuario' ||
+          un.startsWith('jfigueroa') ||
+          un === 'mariotzul' ||
+          un === 'raulalvarado' ||
+          un === 'usuario' ||
+          un === 'residente' ||
+          em === 'usuario@bitacoradigital.com' ||
+          em === 'residente@bitacoradigital.com' ||
+          em === 'mario.tzul@bitacoradigital.com' ||
+          em === 'cfigueroaa@gmail.com' ||
+          em === 'jafm911@gmail.com' ||
+          em.includes('@bitacoradigital.csom')
+        ) {
+          return false;
+        }
+        return true;
+      });
+
+      setUsuarios(usuariosLimpios);
+      localStorage.setItem('bitacora_usuarios_lista', JSON.stringify(usuariosLimpios));
     } catch (_) {
       const stored = localStorage.getItem('bitacora_usuarios_lista');
       if (stored) {
@@ -350,7 +339,7 @@ export default function UsuariosPage() {
       const nombreCompleto = `${pNombre} ${sNombre} ${pApellido} ${sApellido}`.replace(/\s+/g, ' ').trim();
 
       const finalEmail = payload.correo.trim().toLowerCase();
-      const finalUsername = (payload.username || `${pNombre[0] || ''}${pApellido || ''}`).toLowerCase().replace(/[^a-z0-9._]/g, '');
+      const finalUsername = (payload.username || `${pNombre[0] || ''}${pApellido || ''}`).trim().toUpperCase().replace(/[^A-Z0-9._]/g, '');
       const finalTelefono = (payload.telefono || '').trim();
       const telClean = finalTelefono.replace(/[^0-9]/g, '');
       const finalRol = payload.rol || 'Usuario';
@@ -367,7 +356,7 @@ export default function UsuariosPage() {
 
       const dupUser = usuarios.some((u) => {
         if (drawerMode === 'edit' && usuarioActivo && u.id === usuarioActivo.id) return false;
-        return u.username && u.username.trim().toLowerCase() === finalUsername;
+        return u.username && u.username.trim().toUpperCase() === finalUsername;
       });
       if (dupUser) {
         showErrorToast(`El nombre de usuario "@${finalUsername}" ya se encuentra registrado.`);
@@ -404,6 +393,7 @@ export default function UsuariosPage() {
               estado: payload.estado || u.estado,
               cargo: payload.cargo || u.cargo,
               direccion: payload.direccion || null,
+              password: payload.password ? payload.password.trim().toUpperCase() : u.password,
             };
           }
           return u;
@@ -441,6 +431,7 @@ export default function UsuariosPage() {
               username: finalUsername,
               correo: finalEmail,
               rol: finalRol,
+              password: payload.password ? payload.password.trim().toUpperCase() : undefined,
             }),
           });
           if (res.ok) {
@@ -467,13 +458,14 @@ export default function UsuariosPage() {
           estado: payload.estado || 'Activo',
           cargo: payload.cargo,
           direccion: payload.direccion || null,
+          password: payload.password ? payload.password.trim().toUpperCase() : undefined,
           fechaCreacion: new Date().toISOString().slice(0, 10),
           ultimoAcceso: 'Sin accesos todavía',
           contadorAccesos: 0,
         };
 
         // Guardar sin duplicar
-        const sinDuplicados = usuarios.filter((u) => u.correo.toLowerCase() !== finalEmail && u.username?.toLowerCase() !== finalUsername);
+        const sinDuplicados = usuarios.filter((u) => u.correo.toLowerCase() !== finalEmail && u.username?.toUpperCase() !== finalUsername);
         const actualizados = [nuevoUserObj, ...sinDuplicados];
         setUsuarios(actualizados);
         localStorage.setItem('bitacora_usuarios_lista', JSON.stringify(actualizados));

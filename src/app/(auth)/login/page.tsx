@@ -35,23 +35,7 @@ const ACCESOS_RAPIDOS: AccesoRapido[] = [
     email: 'admin@bitacoradigital.com',
     password: 'mariobros25',
     role: 'Administrador',
-    roleLabel: 'Administrador (Subir y Gestionar Bitácoras)',
-  },
-  {
-    id: 'usuario',
-    name: 'Jorge Figueroa',
-    email: 'usuario@bitacoradigital.com',
-    password: 'mariobros25',
-    role: 'Usuario',
-    roleLabel: 'Usuario Normal (Consulta y Visor de PDF)',
-  },
-  {
-    id: 'residente',
-    name: 'Raúl Alvarado',
-    email: 'residente@bitacoradigital.com',
-    password: 'mariobros25',
-    role: 'Usuario',
-    roleLabel: 'Ingeniero Residente (Consulta de Bitácoras)',
+    roleLabel: 'Administrador (Acceso Principal)',
   },
 ];
 
@@ -167,11 +151,8 @@ export default function LoginPage() {
       // Mapeo directo de usuarios base conocidos por su username
       const usuariosBaseMap: Record<string, { email: string; nombre: string; rol: UserRole; cargo: string }> = {
         admin: { email: 'admin@bitacoradigital.com', nombre: 'Daniel Figueroa', rol: 'Administrador', cargo: 'Administrador de Proyecto' },
+        dfigueroa: { email: 'admin@bitacoradigital.com', nombre: 'Daniel Figueroa', rol: 'Administrador', cargo: 'Administrador de Proyecto' },
         danielfigueroa: { email: 'admin@bitacoradigital.com', nombre: 'Daniel Figueroa', rol: 'Administrador', cargo: 'Administrador de Proyecto' },
-        usuario: { email: 'usuario@bitacoradigital.com', nombre: 'Jorge Figueroa', rol: 'Usuario', cargo: 'Supervisor de Obra' },
-        jorgefigueroa: { email: 'usuario@bitacoradigital.com', nombre: 'Jorge Figueroa', rol: 'Usuario', cargo: 'Supervisor de Obra' },
-        residente: { email: 'residente@bitacoradigital.com', nombre: 'Raúl Alvarado', rol: 'Usuario', cargo: 'Ingeniero Residente' },
-        raulalvarado: { email: 'residente@bitacoradigital.com', nombre: 'Raúl Alvarado', rol: 'Usuario', cargo: 'Ingeniero Residente' },
       };
 
       if (!emailParaAuth && usuariosBaseMap[cleanUser]) {
@@ -278,8 +259,8 @@ export default function LoginPage() {
         } else if (usuarioPorUsername) {
           // Validar contraseña de usuario registrado por username o correo
           const passwordValida = usuarioPorUsername.password
-            ? usuarioPorUsername.password === passTrim
-            : passTrim === 'mariobros25';
+            ? (usuarioPorUsername.password === passTrim || usuarioPorUsername.password.toUpperCase() === passTrim.toUpperCase())
+            : (passTrim === 'mariobros25' || passTrim.toUpperCase() === 'MARIOBROS25');
 
           if (passwordValida) {
             if (usuarioPorUsername.estado === 'Suspendido' || usuarioPorUsername.activo === false) {

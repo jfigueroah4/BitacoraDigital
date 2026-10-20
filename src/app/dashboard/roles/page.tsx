@@ -118,7 +118,7 @@ const ROLES_BASE: RolItem[] = [
     estado: 'Activo',
     nivelJerarquico: 'Mando Medio',
     permisos: ['bitacora.ver', 'bitacora.crear', 'bitacora.subir_pdf', 'reportes.ver', 'reportes.exportar'],
-    usuariosAsignados: ['residente@bitacoradigital.com'],
+    usuariosAsignados: [],
   },
   {
     id: 'rol-laboratorio',
@@ -129,7 +129,7 @@ const ROLES_BASE: RolItem[] = [
     estado: 'Activo',
     nivelJerarquico: 'Operativo',
     permisos: ['bitacora.ver', 'bitacora.crear'],
-    usuariosAsignados: ['mario.tzul@bitacoradigital.com'],
+    usuariosAsignados: [],
   },
   {
     id: 'rol-usuario',
@@ -140,7 +140,7 @@ const ROLES_BASE: RolItem[] = [
     estado: 'Activo',
     nivelJerarquico: 'Operativo',
     permisos: ['bitacora.ver'],
-    usuariosAsignados: ['usuario@bitacoradigital.com'],
+    usuariosAsignados: [],
   },
 ];
 

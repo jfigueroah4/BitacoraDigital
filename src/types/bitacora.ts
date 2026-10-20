@@ -5,6 +5,7 @@ export interface UserProfile {
   nombre: string;
   apellido?: string;
   email: string;
+  username?: string;
   rol: UserRole;
   cargo?: string;
 }

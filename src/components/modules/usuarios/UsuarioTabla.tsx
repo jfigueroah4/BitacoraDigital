@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { Trash2, Edit2, Eye, UserX, LogOut, CheckCircle, Laptop, Smartphone } from 'lucide-react';
-import { Usuario } from '@/types/usuario';
+import { Usuario, EstadoUsuario } from '@/types/usuario';
 import { UsuarioEstadoBadge } from './UsuarioEstadoBadge';
 import { UsuarioRolBadge } from './UsuarioRolBadge';
 import { formatearNombrePropio } from '@/lib/utils/formatters';
@@ -15,6 +15,7 @@ interface UsuarioTablaProps {
   onEliminar: (id: string, modoModal?: 'todos' | 'activar' | 'eliminar' | 'suspender') => void;
   onGestionarDispositivos?: (usuario: Usuario) => void;
   currentUserEmail?: string;
+  currentUsername?: string;
   canManage?: boolean;
   sortColumn?: string;
   sortDirection?: 'asc' | 'desc';
@@ -28,6 +29,7 @@ export const UsuarioTabla = React.memo(function UsuarioTabla({
   onEliminar,
   onGestionarDispositivos,
   currentUserEmail,
+  currentUsername,
   canManage = true,
   sortColumn,
   sortDirection,
@@ -115,6 +117,16 @@ export const UsuarioTabla = React.memo(function UsuarioTabla({
           const sesiones = obtenerSesionesUsuario(usuario.correo);
           const tieneSesiones = sesiones.length > 0;
           const estadoMostrado: EstadoUsuario = esSuspendido ? 'Suspendido' : (tieneSesiones ? 'Activo' : 'Inactivo');
+          const isTargetAdmin = usuario.rol === 'Administrador';
+          const isTargetMainAdmin =
+            usuario.username?.toLowerCase() === 'dfigueroa' ||
+            usuario.correo?.toLowerCase() === 'admin@bitacoradigital.com';
+          const isMainAdmin =
+            currentUserEmail?.toLowerCase() === 'admin@bitacoradigital.com' ||
+            currentUsername?.toLowerCase() === 'dfigueroa';
+
+          // Solo el administrador dfigueroa puede eliminar administradores
+          const puedeEliminarEsteUsuario = canManage && !isSelf && !isTargetMainAdmin && (!isTargetAdmin || isMainAdmin);
 
           return (
             <div
@@ -131,7 +143,7 @@ export const UsuarioTabla = React.memo(function UsuarioTabla({
                       {nombreCompleto}
                     </p>
                     <p className="text-[10px] text-[#9B0F06] font-semibold truncate mt-0.5">
-                      {usuario.username ? `@${usuario.username}` : usuario.correo}
+                      {usuario.username ? `@${usuario.username.toUpperCase()}` : usuario.correo}
                     </p>
                     {usuario.username && (
                       <p className="text-[9.5px] text-gray-400 truncate">{usuario.correo}</p>
@@ -145,10 +157,16 @@ export const UsuarioTabla = React.memo(function UsuarioTabla({
                 <UsuarioRolBadge rol={usuario.rol} />
               </div>
 
-              {/* Registro de accesos (DomunNet) */}
-              <div className="flex items-center justify-between text-[10px] text-gray-500 pt-1 border-t border-gray-100">
-                <span>Último acceso: <strong className="text-gray-700">{usuario.ultimoAcceso || 'Sin accesos'}</strong></span>
-                <span className="font-semibold text-[#9B0F06]">{usuario.contadorAccesos || (tieneSesiones ? 1 : 0)} ingresos</span>
+              {/* Registro de accesos: Dos campos separados con color negro */}
+              <div className="space-y-1 pt-1 border-t border-gray-100 text-[10px]">
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-400 font-semibold uppercase text-[9px]">Último Acceso:</span>
+                  <span className="font-medium text-gray-700">{usuario.ultimoAcceso || 'Sin accesos todavía'}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-400 font-semibold uppercase text-[9px]">Cantidad de Ingresos:</span>
+                  <span className="font-bold text-gray-900">{usuario.contadorAccesos || (tieneSesiones ? 1 : 0)} {usuario.contadorAccesos === 1 ? 'ingreso' : 'ingresos'}</span>
+                </div>
               </div>
 
               <div className="flex items-center justify-end gap-1.5 pt-2 border-t border-gray-100">
@@ -189,44 +207,66 @@ export const UsuarioTabla = React.memo(function UsuarioTabla({
                 )}
 
                 {canManage && (esSuspendido ? (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => onEliminar(usuario.id, 'activar')}
-                      className="p-1.5 rounded-lg border border-gray-200 bg-white text-emerald-600 hover:bg-emerald-50 cursor-pointer shadow-2xs"
-                      title="Activar usuario"
-                    >
-                      <CheckCircle size={12} />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => onEliminar(usuario.id, 'eliminar')}
-                      className="p-1.5 rounded-lg border border-gray-200 bg-white text-red-600 hover:bg-red-50 cursor-pointer shadow-2xs"
-                      title="Eliminar usuario definitivamente"
-                    >
-                      <Trash2 size={12} />
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => onEliminar(usuario.id, 'suspender')}
-                      className="p-1.5 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-amber-50 hover:text-amber-600 cursor-pointer shadow-2xs"
-                      title="Suspender usuario"
-                    >
-                      <UserX size={12} />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => onEliminar(usuario.id, 'eliminar')}
-                      className="p-1.5 rounded-lg border border-gray-200 bg-white text-red-600 hover:bg-red-50 cursor-pointer shadow-2xs"
-                      title="Eliminar usuario definitivamente"
-                    >
-                      <Trash2 size={12} />
-                    </button>
-                  </>
-                ))}
+                          <>
+                            {puedeEliminarEsteUsuario && (
+                              <button
+                                type="button"
+                                onClick={() => onEliminar(usuario.id, 'activar')}
+                                className="p-1 text-gray-400 hover:text-emerald-600 transition-colors cursor-pointer"
+                                title="Activar usuario"
+                              >
+                                <CheckCircle size={13} />
+                              </button>
+                            )}
+                            {puedeEliminarEsteUsuario ? (
+                              <button
+                                type="button"
+                                onClick={() => onEliminar(usuario.id, 'eliminar')}
+                                className="p-1 text-gray-400 hover:text-red-600 transition-colors cursor-pointer"
+                                title="Eliminar usuario definitivamente"
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            ) : isTargetAdmin && !isMainAdmin ? (
+                              <span
+                                className="p-1 text-gray-300 cursor-not-allowed inline-block"
+                                title="Solo el administrador @dfigueroa puede eliminar otros administradores"
+                              >
+                                <Trash2 size={13} />
+                              </span>
+                            ) : null}
+                          </>
+                        ) : (
+                          <>
+                            {puedeEliminarEsteUsuario && (
+                              <button
+                                type="button"
+                                onClick={() => onEliminar(usuario.id, 'suspender')}
+                                className="p-1 text-gray-400 hover:text-amber-600 transition-colors cursor-pointer"
+                                title="Suspender usuario (bloquea su acceso)"
+                              >
+                                <UserX size={13} />
+                              </button>
+                            )}
+                            {puedeEliminarEsteUsuario ? (
+                              <button
+                                type="button"
+                                onClick={() => onEliminar(usuario.id, 'eliminar')}
+                                className="p-1 text-gray-400 hover:text-red-600 transition-colors cursor-pointer"
+                                title="Eliminar usuario definitivamente"
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            ) : isTargetAdmin && !isMainAdmin ? (
+                              <span
+                                className="p-1 text-gray-300 cursor-not-allowed inline-block"
+                                title="Solo el administrador @dfigueroa puede eliminar otros administradores"
+                              >
+                                <Trash2 size={13} />
+                              </span>
+                            ) : null}
+                          </>
+                        ))}
               </div>
             </div>
           );
@@ -267,7 +307,13 @@ export const UsuarioTabla = React.memo(function UsuarioTabla({
                   className="px-4 py-3 text-[10px] text-gray-400 uppercase tracking-wider font-bold cursor-pointer hover:text-gray-600 select-none"
                   onClick={() => handleSort('ultimoAcceso')}
                 >
-                  Último Acceso / Ingresos{sortIndicator('ultimoAcceso')}
+                  Último Acceso{sortIndicator('ultimoAcceso')}
+                </th>
+                <th
+                  className="px-4 py-3 text-[10px] text-gray-400 uppercase tracking-wider font-bold cursor-pointer hover:text-gray-600 select-none"
+                  onClick={() => handleSort('contadorAccesos')}
+                >
+                  Ingresos{sortIndicator('contadorAccesos')}
                 </th>
                 <th className="text-right px-4 py-3 text-[10px] text-gray-400 uppercase tracking-wider font-bold">
                   Acciones
@@ -288,6 +334,15 @@ export const UsuarioTabla = React.memo(function UsuarioTabla({
                 const sesiones = obtenerSesionesUsuario(usuario.correo);
                 const tieneSesiones = sesiones.length > 0;
                 const estadoMostrado: EstadoUsuario = esSuspendido ? 'Suspendido' : (tieneSesiones ? 'Activo' : 'Inactivo');
+                const isTargetAdmin = usuario.rol === 'Administrador';
+                const isTargetMainAdmin =
+                  usuario.username?.toLowerCase() === 'dfigueroa' ||
+                  usuario.correo?.toLowerCase() === 'admin@bitacoradigital.com';
+                const isMainAdmin =
+                  currentUserEmail?.toLowerCase() === 'admin@bitacoradigital.com' ||
+                  currentUsername?.toLowerCase() === 'dfigueroa';
+
+                const puedeEliminarEsteUsuario = canManage && !isSelf && !isTargetMainAdmin && (!isTargetAdmin || isMainAdmin);
 
                 return (
                   <tr key={usuario.id} className="hover:bg-gray-50/70 transition-colors">
@@ -303,7 +358,7 @@ export const UsuarioTabla = React.memo(function UsuarioTabla({
                           <div className="flex items-center gap-1.5 mt-0.5">
                             {usuario.username && (
                               <span className="text-[10.5px] font-semibold text-[#9B0F06]">
-                                @{usuario.username}
+                                @{usuario.username.toUpperCase()}
                               </span>
                             )}
                             <span className="text-[9.5px] text-gray-400">
@@ -320,13 +375,11 @@ export const UsuarioTabla = React.memo(function UsuarioTabla({
                     <td className="px-4 py-3.5">
                       <UsuarioEstadoBadge estado={estadoMostrado} />
                     </td>
-                    <td className="px-4 py-3.5 text-[11px]">
-                      <p className="font-semibold text-gray-800 leading-tight">
-                        {usuario.ultimoAcceso || 'Sin accesos'}
-                      </p>
-                      <p className="text-[10px] text-[#9B0F06] font-medium mt-0.5">
-                        {usuario.contadorAccesos || (tieneSesiones ? 1 : 0)} {usuario.contadorAccesos === 1 ? 'ingreso' : 'ingresos'}
-                      </p>
+                    <td className="px-4 py-3.5 text-[11px] text-gray-700 font-medium">
+                      {usuario.ultimoAcceso || 'Sin accesos todavía'}
+                    </td>
+                    <td className="px-4 py-3.5 text-[11px] font-semibold text-gray-900">
+                      {usuario.contadorAccesos || (tieneSesiones ? 1 : 0)} {usuario.contadorAccesos === 1 ? 'ingreso' : 'ingresos'}
                     </td>
                     <td className="text-right px-4 py-3.5">
                       <div className="flex items-center justify-end gap-1">
@@ -370,41 +423,63 @@ export const UsuarioTabla = React.memo(function UsuarioTabla({
 
                         {canManage && (esSuspendido ? (
                           <>
-                            <button
-                              type="button"
-                              onClick={() => onEliminar(usuario.id, 'activar')}
-                              className="p-1 text-gray-400 hover:text-emerald-600 transition-colors cursor-pointer"
-                              title="Activar usuario"
-                            >
-                              <CheckCircle size={13} />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => onEliminar(usuario.id, 'eliminar')}
-                              className="p-1 text-gray-400 hover:text-red-600 transition-colors cursor-pointer"
-                              title="Eliminar usuario definitivamente"
-                            >
-                              <Trash2 size={13} />
-                            </button>
+                            {puedeEliminarEsteUsuario && (
+                              <button
+                                type="button"
+                                onClick={() => onEliminar(usuario.id, 'activar')}
+                                className="p-1 text-gray-400 hover:text-emerald-600 transition-colors cursor-pointer"
+                                title="Activar usuario"
+                              >
+                                <CheckCircle size={13} />
+                              </button>
+                            )}
+                            {puedeEliminarEsteUsuario ? (
+                              <button
+                                type="button"
+                                onClick={() => onEliminar(usuario.id, 'eliminar')}
+                                className="p-1 text-gray-400 hover:text-red-600 transition-colors cursor-pointer"
+                                title="Eliminar usuario definitivamente"
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            ) : isTargetAdmin && !isMainAdmin ? (
+                              <span
+                                className="p-1 text-gray-300 cursor-not-allowed inline-block"
+                                title="Solo el administrador principal (@dfigueroa) puede eliminar a otros administradores"
+                              >
+                                <Trash2 size={13} />
+                              </span>
+                            ) : null}
                           </>
                         ) : (
                           <>
-                            <button
-                              type="button"
-                              onClick={() => onEliminar(usuario.id, 'suspender')}
-                              className="p-1 text-gray-400 hover:text-amber-600 transition-colors cursor-pointer"
-                              title="Suspender usuario (bloquea su acceso)"
-                            >
-                              <UserX size={13} />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => onEliminar(usuario.id, 'eliminar')}
-                              className="p-1 text-gray-400 hover:text-red-600 transition-colors cursor-pointer"
-                              title="Eliminar usuario definitivamente"
-                            >
-                              <Trash2 size={13} />
-                            </button>
+                            {puedeEliminarEsteUsuario && (
+                              <button
+                                type="button"
+                                onClick={() => onEliminar(usuario.id, 'suspender')}
+                                className="p-1 text-gray-400 hover:text-amber-600 transition-colors cursor-pointer"
+                                title="Suspender usuario (bloquea su acceso)"
+                              >
+                                <UserX size={13} />
+                              </button>
+                            )}
+                            {puedeEliminarEsteUsuario ? (
+                              <button
+                                type="button"
+                                onClick={() => onEliminar(usuario.id, 'eliminar')}
+                                className="p-1 text-gray-400 hover:text-red-600 transition-colors cursor-pointer"
+                                title="Eliminar usuario definitivamente"
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            ) : isTargetAdmin && !isMainAdmin ? (
+                              <span
+                                className="p-1 text-gray-300 cursor-not-allowed inline-block"
+                                title="Solo el administrador principal (@dfigueroa) puede eliminar a otros administradores"
+                              >
+                                <Trash2 size={13} />
+                              </span>
+                            ) : null}
                           </>
                         ))}
                       </div>

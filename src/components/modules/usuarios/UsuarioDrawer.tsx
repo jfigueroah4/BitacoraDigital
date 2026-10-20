@@ -165,6 +165,14 @@ export function UsuarioDrawer({
     setIsUsernameAuto(true);
   };
 
+  const handleRegenerarPassword = () => {
+    const sugerida = generarContrasenaSugerida();
+    setPassword(sugerida);
+    setConfirmPassword(sugerida);
+    setShowPassword(true);
+    setShowConfirmPassword(true);
+  };
+
   // Validaciones DomunNet
   const markTouched = (field: string) => {
     setTouched((prev) => ({ ...prev, [field]: true }));
@@ -185,17 +193,17 @@ export function UsuarioDrawer({
   const validUsername = useMemo(() => {
     const val = username.trim();
     if (!val) return true; // Puede ser opcional, pero si está, debe cumplir formato
-    return /^[a-z0-9._]{3,30}$/.test(val);
+    return /^[A-Z0-9._]{3,30}$/i.test(val);
   }, [username]);
 
   const isUsernameDuplicated = useMemo(() => {
-    const val = (username.trim() || (isUsernameAuto ? generarUsernameSugerido(primerNombre, primerApellido) : '')).toLowerCase();
+    const val = (username.trim() || (isUsernameAuto ? generarUsernameSugerido(primerNombre, primerApellido) : '')).toUpperCase();
     if (!val || !usuariosExistentes || usuariosExistentes.length === 0) return false;
     return usuariosExistentes.some((u) => {
       if (usuario && (u.id === usuario.id || u.correo?.toLowerCase() === usuario.correo?.toLowerCase())) {
         return false;
       }
-      return u.username && u.username.trim().toLowerCase() === val;
+      return u.username && u.username.trim().toUpperCase() === val;
     });
   }, [username, isUsernameAuto, primerNombre, primerApellido, usuariosExistentes, usuario]);
 
@@ -331,14 +339,14 @@ export function UsuarioDrawer({
         segundo_nombre: segundoNombre.trim() || null,
         primer_apellido: primerApellido.trim(),
         segundo_apellido: segundoApellido.trim() || null,
-        username: username.trim().toLowerCase() || generarUsernameSugerido(primerNombre, primerApellido),
+        username: (username.trim() || generarUsernameSugerido(primerNombre, primerApellido)).toUpperCase(),
         correo: correo.trim().toLowerCase(),
         telefono: telefono.trim(),
         cargo: cargo.trim() || 'Colaborador',
         rol,
         estado,
         direccion: direccion.trim() || null,
-        password: password.trim() || undefined,
+        password: password.trim().toUpperCase() || undefined,
       };
 
       await onSave?.(payload);
@@ -556,15 +564,15 @@ export function UsuarioDrawer({
                 <AtSign size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                 <input
                   type="text"
-                  placeholder="ej. dfigueroa"
+                  placeholder="EJ. DFIGUEROA"
                   value={username}
                   onChange={(e) => {
-                    setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9._]/g, ''));
+                    setUsername(e.target.value.toUpperCase().replace(/[^A-Z0-9._]/g, ''));
                     setIsUsernameAuto(false);
                   }}
                   onBlur={() => markTouched('username')}
                   disabled={isView}
-                  className={`w-full pl-9 pr-8 py-2 bg-gray-50 border rounded-xl text-xs text-gray-800 outline-none transition-colors disabled:bg-gray-100/60 disabled:text-gray-600 font-mono ${
+                  className={`w-full pl-9 pr-8 py-2 bg-gray-50 border rounded-xl text-xs text-gray-800 outline-none transition-colors disabled:bg-gray-100/60 disabled:text-gray-600 font-mono uppercase ${
                     (touched.username && !validUsername) || isUsernameDuplicated
                       ? 'border-red-400 focus:border-red-500 bg-red-50/20'
                       : touched.username && validUsername && username && !isUsernameDuplicated
@@ -578,7 +586,7 @@ export function UsuarioDrawer({
               </div>
               {username && !validUsername && (
                 <p className="text-[10px] text-red-500 mt-1 flex items-center gap-1">
-                  <AlertCircle size={11} /> Mínimo 3 caracteres (solo letras minúsculas, números, punto o guión bajo)
+                  <AlertCircle size={11} /> Mínimo 3 caracteres (solo letras, números, punto o guión bajo)
                 </p>
               )}
               {isUsernameDuplicated && (
@@ -588,7 +596,7 @@ export function UsuarioDrawer({
               )}
               {username && validUsername && !isUsernameDuplicated && isCreate && (
                 <p className="text-[10px] text-gray-400 mt-0.5">
-                  Podrá iniciar sesión escribiendo <span className="font-semibold text-gray-600 font-mono">@{username}</span>
+                  Podrá iniciar sesión escribiendo <span className="font-semibold text-gray-600 font-mono">@{username.toUpperCase()}</span>
                 </p>
               )}
             </div>
@@ -729,25 +737,36 @@ export function UsuarioDrawer({
             {!isView && (
               <div className="space-y-3 p-3.5 bg-gray-50 rounded-xl border border-gray-200/70">
                 <div>
-                  <label className="text-[11px] font-bold text-gray-700 block mb-1">
-                    {isCreate ? (
-                      <>
-                        Contraseña de Acceso <span className="text-red-500">*</span>
-                      </>
-                    ) : (
-                      'Nueva Contraseña (Opcional)'
-                    )}
-                  </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-[11px] font-bold text-gray-700 block">
+                      {isCreate ? (
+                        <>
+                          Contraseña de Acceso <span className="text-red-500">*</span>
+                        </>
+                      ) : (
+                        'Nueva Contraseña (Opcional)'
+                      )}
+                    </label>
+                    <button
+                      type="button"
+                      onClick={handleRegenerarPassword}
+                      title="Generar contraseña segura en mayúsculas"
+                      className="inline-flex items-center gap-1 text-[10px] font-semibold text-[#9B0F06] hover:text-[#5E0006] transition-colors cursor-pointer"
+                    >
+                      <Sparkles size={11} />
+                      <span>Autogenerar</span>
+                    </button>
+                  </div>
                   <div className="relative">
                     <Lock size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                     <input
                       type={showPassword ? 'text' : 'password'}
-                      placeholder={isCreate ? 'Mínimo 6 caracteres' : 'Dejar en blanco para conservar actual'}
+                      placeholder={isCreate ? 'EJ. BITACORA2026' : 'Dejar en blanco para conservar actual'}
                       value={password}
-                      onChange={(e) => setPassword(e.target.value)}
+                      onChange={(e) => setPassword(e.target.value.toUpperCase())}
                       onBlur={() => markTouched('password')}
                       required={isCreate}
-                      className="w-full pl-9 pr-9 py-2 bg-white border border-gray-200 rounded-xl text-xs text-gray-800 outline-none focus:border-[#9B0F06]"
+                      className="w-full pl-9 pr-9 py-2 bg-white border border-gray-200 rounded-xl text-xs text-gray-800 outline-none focus:border-[#9B0F06] font-mono tracking-wider uppercase"
                     />
                     <button
                       type="button"
@@ -812,10 +831,10 @@ export function UsuarioDrawer({
                       type={showConfirmPassword ? 'text' : 'password'}
                       placeholder="Repite la contraseña para verificar"
                       value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      onChange={(e) => setConfirmPassword(e.target.value.toUpperCase())}
                       onBlur={() => markTouched('confirmPassword')}
                       required={isCreate || Boolean(password)}
-                      className={`w-full pl-9 pr-9 py-2 bg-white border rounded-xl text-xs text-gray-800 outline-none transition-colors ${
+                      className={`w-full pl-9 pr-9 py-2 bg-white border rounded-xl text-xs text-gray-800 outline-none transition-colors font-mono tracking-wider uppercase ${
                         confirmPassword && !passwordsMatch
                           ? 'border-red-400 focus:border-red-500'
                           : confirmPassword && passwordsMatch

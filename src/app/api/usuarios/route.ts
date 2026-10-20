@@ -111,7 +111,7 @@ export async function POST(req: NextRequest) {
       segundo_nombre: segundo_nombre || null,
       primer_apellido,
       segundo_apellido: segundo_apellido || null,
-      username: username || `${primer_nombre?.[0] || ''}${primer_apellido || ''}`.toLowerCase().replace(/[^a-z0-9]/g, ''),
+      username: (username || `${primer_nombre?.[0] || ''}${primer_apellido || ''}`).toUpperCase().replace(/[^A-Z0-9]/g, ''),
       nombre: nombreCompleto,
       correo,
       telefono: telefono || '',
