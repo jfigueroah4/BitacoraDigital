@@ -40,14 +40,14 @@ interface UsuarioDrawerProps {
 
 const ROLES_LISTA: RolUsuario[] = ['Administrador', 'Usuario'];
 
-// Función para normalizar texto a formato de username (ej. "José Pérez" -> "jperez")
+// Función para normalizar texto a formato de username en MAYÚSCULAS (ej. "José Pérez" -> "JPEREZ")
 export function generarUsernameSugerido(nombre: string, apellido: string): string {
   const normalizar = (str: string) =>
     str
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '') // Quitar acentos
-      .toLowerCase()
-      .replace(/[^a-z0-9]/g, ''); // Solo alfanuméricos
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g, ''); // Solo alfanuméricos
 
   const n = normalizar(nombre.trim());
   const a = normalizar(apellido.trim());
@@ -57,6 +57,21 @@ export function generarUsernameSugerido(nombre: string, apellido: string): strin
   }
   if (a) return a;
   return n;
+}
+
+// Función para generar contraseña segura en MAYÚSCULAS
+export function generarContrasenaSugerida(): string {
+  const letras = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+  const numeros = '23456789';
+  let randLetras = '';
+  for (let i = 0; i < 4; i++) {
+    randLetras += letras.charAt(Math.floor(Math.random() * letras.length));
+  }
+  let randNums = '';
+  for (let i = 0; i < 4; i++) {
+    randNums += numeros.charAt(Math.floor(Math.random() * numeros.length));
+  }
+  return `BITACORA${randNums}${randLetras}`;
 }
 
 export function UsuarioDrawer({

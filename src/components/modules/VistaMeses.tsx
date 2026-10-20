@@ -38,8 +38,8 @@ interface VistaMesesProps {
 }
 
 const ANIOS_DISPONIBLES = [
-  2020, 2021, 2022, 2023, 2024, 2025, 2026, 2027, 2028, 2029,
-  2030, 2031, 2032, 2033, 2034, 2035, 2036, 2037, 2038, 2039, 2040, 2041, 2042, 2043, 2044, 2045
+  2026, 2027, 2028, 2029, 2030, 2031, 2032, 2033, 2034, 2035,
+  2036, 2037, 2038, 2039, 2040, 2041, 2042, 2043, 2044, 2045, 2046
 ];
 
 /**
@@ -381,34 +381,38 @@ export default function VistaMeses({
 
       {/* Top Controls Bar */}
       <div className="space-y-3">
-        {/* Fila 1: Duración del Proyecto a la izquierda, Contador de folios arriba del botón Subir */}
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          {/* Apartado para establecer la duración del proyecto sin negrilla en el contenido */}
-          <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-xl px-3 py-1.5 shadow-2xs">
-            <Clock size={14} className="text-[#3B2219] shrink-0" />
-            <div className="flex items-center gap-1.5 text-xs">
-              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                Duración:
-              </span>
-              <span className="font-normal text-gray-700">
-                {nombreMesInicio} {duracionProyecto.anioInicio} — {nombreMesFin} {duracionProyecto.anioFin}
-              </span>
+        {/* Fila 1: Duración del Proyecto adaptada con diseño responsivo en mobile */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3">
+          {/* Tarjeta de Duración responsiva que no comprime el texto en pantallas pequeñas */}
+          <div className="w-full sm:w-auto flex items-center justify-between gap-2.5 bg-white border border-gray-200 rounded-2xl p-2.5 sm:px-3.5 sm:py-2 shadow-2xs">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-8 h-8 rounded-xl bg-[#F4ECE6] flex items-center justify-center shrink-0 text-[#3B2219]">
+                <Clock size={15} />
+              </div>
+              <div className="flex flex-col sm:flex-row sm:items-center sm:gap-1.5 min-w-0">
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider shrink-0">
+                  Duración:
+                </span>
+                <span className="text-xs font-semibold text-gray-800 sm:font-normal sm:text-gray-700 truncate">
+                  {nombreMesInicio} {duracionProyecto.anioInicio} — {nombreMesFin} {duracionProyecto.anioFin}
+                </span>
+              </div>
             </div>
             {esAdmin && (
               <button
                 type="button"
                 onClick={handleAbrirModalDuracion}
-                className="ml-1 text-[10px] font-bold text-[#3B2219] hover:text-[#2A1710] hover:underline flex items-center gap-1 px-1.5 py-0.5 rounded-md hover:bg-[#F4ECE6] transition-colors cursor-pointer"
+                className="shrink-0 bg-[#F4ECE6] hover:bg-[#ebdcd1] text-[#3B2219] text-[11px] font-bold px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs ml-2"
                 title="Establecer duración del proyecto"
               >
-                <Settings size={12} />
+                <Settings size={13} />
                 <span>Establecer</span>
               </button>
             )}
           </div>
 
-          {/* Contador de folios ubicado directamente arriba del botón Subir Documento */}
-          <div className="text-xs font-semibold text-gray-600 bg-white border border-gray-200 px-3 py-1.5 rounded-xl shadow-2xs shrink-0">
+          {/* Contador de folios */}
+          <div className="self-end sm:self-auto text-xs font-semibold text-gray-600 bg-white border border-gray-200 px-3 py-1.5 rounded-xl shadow-2xs shrink-0">
             <span className="text-[#3B2219] font-bold">{totalFolios}</span> folios subidos
           </div>
         </div>
@@ -445,22 +449,17 @@ export default function VistaMeses({
             )}
           </div>
 
-          {/* Panel de Filtros: Desplegable en mobile y siempre visible en Desktop */}
-          <div
-            className={`${
-              mostrarFiltrosMobile ? 'flex flex-col' : 'hidden sm:flex'
-            } sm:flex-row sm:items-center justify-between gap-3 bg-white sm:bg-transparent p-3 sm:p-0 rounded-2xl sm:rounded-none border sm:border-none border-gray-200 shadow-2xs sm:shadow-none transition-all`}
-          >
-            {/* Controles de Filtros */}
-            <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 flex-wrap">
-              <div className="hidden sm:flex items-center gap-1.5 text-xs font-bold text-gray-700">
+          {/* Barra de Filtros en Desktop (siempre visible en horizontal) */}
+          <div className="hidden sm:flex sm:items-center justify-between gap-3 bg-transparent p-0">
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-gray-700">
                 <Filter size={14} className="text-[#3B2219]" />
                 <span>Filtrar por rango:</span>
               </div>
 
               {/* Rango de Fechas: Inicio y Fin */}
-              <div className="grid grid-cols-2 sm:flex sm:items-center gap-2">
-                <div className="flex items-center gap-1.5 bg-gray-50 sm:bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 sm:py-1 shadow-2xs">
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5 bg-white border border-gray-200 rounded-lg px-2.5 py-1 shadow-2xs">
                   <span className="text-[10px] font-bold text-gray-400 uppercase">Inicio:</span>
                   <input
                     type="date"
@@ -470,7 +469,7 @@ export default function VistaMeses({
                   />
                 </div>
 
-                <div className="flex items-center gap-1.5 bg-gray-50 sm:bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 sm:py-1 shadow-2xs">
+                <div className="flex items-center gap-1.5 bg-white border border-gray-200 rounded-lg px-2.5 py-1 shadow-2xs">
                   <span className="text-[10px] font-bold text-gray-400 uppercase">Fin:</span>
                   <input
                     type="date"
@@ -481,10 +480,9 @@ export default function VistaMeses({
                 </div>
               </div>
 
-              {/* Selectores de Mes y Año */}
-              <div className="grid grid-cols-2 sm:flex sm:items-center gap-2">
-                {/* Selector de Mes */}
-                <div className="flex items-center gap-1.5 bg-gray-50 sm:bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 sm:py-1 shadow-2xs">
+              {/* Selectores de Mes y Año en Desktop */}
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5 bg-white border border-gray-200 rounded-lg px-2.5 py-1 shadow-2xs">
                   <span className="text-[10px] font-bold text-gray-400 uppercase">Mes:</span>
                   <select
                     value={mesFiltro ?? 'todos'}
@@ -493,7 +491,7 @@ export default function VistaMeses({
                       onMesFiltroChange?.(val);
                       setPaginaActual(1);
                     }}
-                    className="bg-transparent text-xs font-bold text-gray-900 outline-none cursor-pointer w-full"
+                    className="bg-transparent text-xs font-bold text-gray-900 outline-none cursor-pointer"
                   >
                     <option value="todos">Todos los meses</option>
                     {MESES_NOMBRES.map((nombre, idx) => (
@@ -504,8 +502,7 @@ export default function VistaMeses({
                   </select>
                 </div>
 
-                {/* Selector de Años con amplia lista de años */}
-                <div className="flex items-center gap-1.5 bg-gray-50 sm:bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 sm:py-1 shadow-2xs">
+                <div className="flex items-center gap-1.5 bg-white border border-gray-200 rounded-lg px-2.5 py-1 shadow-2xs">
                   <span className="text-[10px] font-bold text-gray-400 uppercase">Año:</span>
                   <select
                     value={anioActual}
@@ -514,7 +511,7 @@ export default function VistaMeses({
                       onAnioChange?.(val);
                       setPaginaActual(1);
                     }}
-                    className="bg-transparent text-xs font-bold text-gray-900 outline-none cursor-pointer w-full"
+                    className="bg-transparent text-xs font-bold text-gray-900 outline-none cursor-pointer"
                   >
                     <option value="todos">Todos los años</option>
                     {ANIOS_DISPONIBLES.map((a) => (
@@ -526,7 +523,7 @@ export default function VistaMeses({
                 </div>
               </div>
 
-              {/* Botón Limpiar Filtros */}
+              {/* Botón Limpiar Filtros en Desktop */}
               {hayFiltrosActivos && (
                 <button
                   type="button"
@@ -666,6 +663,158 @@ export default function VistaMeses({
           </button>
         </div>
       </div>
+
+      {/* Modal de Filtros en Mobile estilo DomunNet */}
+      {mounted && mostrarFiltrosMobile && createPortal(
+        <div className="fixed inset-0 z-[9999] sm:hidden flex items-end justify-center bg-black/60 backdrop-blur-xs animate-fadeIn">
+          {/* Backdrop con clic para cerrar */}
+          <div
+            className="fixed inset-0 -z-10"
+            onClick={() => setMostrarFiltrosMobile(false)}
+          />
+
+          <div
+            className="relative w-full max-w-lg bg-white rounded-t-3xl shadow-2xl border border-gray-200 overflow-hidden flex flex-col max-h-[85vh] animate-slideUp font-poppins"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Cabecera del modal */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 bg-gray-50/90">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-[#F4ECE6] flex items-center justify-center text-[#3B2219]">
+                  <Filter size={16} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-gray-900 leading-tight">
+                    Filtros de Búsqueda
+                  </h3>
+                  <p className="text-[10px] text-gray-500">
+                    Filtra la bitácora por rango de fechas, mes o año
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setMostrarFiltrosMobile(false)}
+                className="text-gray-400 hover:text-gray-700 p-1.5 rounded-xl hover:bg-gray-100 transition-colors cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Contenido de Filtros */}
+            <div className="p-5 space-y-4 overflow-y-auto text-xs">
+              {/* Rango de Fechas */}
+              <div className="space-y-1.5">
+                <label className="text-[10.5px] font-bold text-[#3B2219] uppercase tracking-wider block">
+                  Rango de Fechas
+                </label>
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div className="bg-gray-50 border border-gray-200 rounded-xl px-3 py-2">
+                    <span className="text-[9.5px] font-bold text-gray-400 uppercase block mb-0.5">
+                      Desde:
+                    </span>
+                    <input
+                      type="date"
+                      value={fechaInicio}
+                      onChange={(e) => onFechaInicioChange(e.target.value)}
+                      className="bg-transparent text-xs text-gray-800 outline-none font-medium w-full"
+                    />
+                  </div>
+                  <div className="bg-gray-50 border border-gray-200 rounded-xl px-3 py-2">
+                    <span className="text-[9.5px] font-bold text-gray-400 uppercase block mb-0.5">
+                      Hasta:
+                    </span>
+                    <input
+                      type="date"
+                      value={fechaFin}
+                      onChange={(e) => onFechaFinChange(e.target.value)}
+                      className="bg-transparent text-xs text-gray-800 outline-none font-medium w-full"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Selector de Mes */}
+              <div className="space-y-1.5">
+                <label className="text-[10.5px] font-bold text-[#3B2219] uppercase tracking-wider block">
+                  Mes
+                </label>
+                <div className="bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5">
+                  <select
+                    value={mesFiltro ?? 'todos'}
+                    onChange={(e) => {
+                      const val = e.target.value === 'todos' ? 'todos' : Number(e.target.value);
+                      onMesFiltroChange?.(val);
+                      setPaginaActual(1);
+                    }}
+                    className="bg-transparent text-xs font-bold text-gray-900 outline-none cursor-pointer w-full"
+                  >
+                    <option value="todos">Todos los meses</option>
+                    {MESES_NOMBRES.map((nombre, idx) => (
+                      <option key={idx} value={idx + 1}>
+                        {nombre}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Selector de Año */}
+              <div className="space-y-1.5">
+                <label className="text-[10.5px] font-bold text-[#3B2219] uppercase tracking-wider block">
+                  Año
+                </label>
+                <div className="bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5">
+                  <select
+                    value={anioActual}
+                    onChange={(e) => {
+                      const val = e.target.value === 'todos' ? 'todos' : Number(e.target.value);
+                      onAnioChange?.(val);
+                      setPaginaActual(1);
+                    }}
+                    className="bg-transparent text-xs font-bold text-gray-900 outline-none cursor-pointer w-full"
+                  >
+                    <option value="todos">Todos los años</option>
+                    {ANIOS_DISPONIBLES.map((a) => (
+                      <option key={a} value={a}>
+                        {a}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer de Acciones estilo DomunNet */}
+            <div className="p-4 border-t border-gray-100 bg-gray-50/50 flex items-center justify-between gap-3">
+              {hayFiltrosActivos ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onLimpiarFiltros();
+                    onAnioChange?.('todos');
+                    onMesFiltroChange?.('todos');
+                  }}
+                  className="text-xs font-bold text-red-600 hover:text-red-700 hover:underline px-2 py-1.5 cursor-pointer"
+                >
+                  Limpiar filtros
+                </button>
+              ) : (
+                <span className="text-[11px] text-gray-400">Sin filtros aplicados</span>
+              )}
+
+              <button
+                type="button"
+                onClick={() => setMostrarFiltrosMobile(false)}
+                className="bg-[#3B2219] hover:bg-[#2A1710] text-white text-xs font-bold px-5 py-2.5 rounded-xl shadow-md transition-colors cursor-pointer ml-auto"
+              >
+                Aplicar filtros
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
 
       {/* Modal para establecer la duración del proyecto renderizado en el portal de document.body para evitar desalineaciones */}
       {mounted && modalDuracionAbierto && createPortal(

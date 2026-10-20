@@ -128,8 +128,8 @@ export default function SubirDocumentoModal({
     const aFin = Number(duracionProyecto.anioFin);
     if (isNaN(aIni) || isNaN(aFin)) return fallback;
 
-    const min = Math.min(aIni, 2020);
-    const max = Math.max(aFin, 2035);
+    const min = Math.min(aIni, 2026);
+    const max = Math.max(aFin, 2046);
     const lista: number[] = [];
     for (let y = min; y <= max; y++) {
       lista.push(y);

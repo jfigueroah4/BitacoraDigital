@@ -24,6 +24,7 @@ export interface Usuario {
   fechaCreacion: string;
   ultimoAcceso?: string;
   contadorAccesos?: number;
+  password?: string;
   telefono?: string;
   cargo?: string;
   fecha_nacimiento?: string | null;
