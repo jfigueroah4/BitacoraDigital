@@ -69,19 +69,14 @@ export default function ModalDispositivosConectados({
         >
           {/* Header */}
           <div className="flex items-start justify-between gap-3 border-b border-gray-100 pb-3.5">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-[#F4ECE6] text-[#3B2219] flex items-center justify-center shrink-0">
-                <Shield size={20} />
-              </div>
-              <div>
-                <h3 className="text-sm sm:text-base font-extrabold text-gray-900 leading-tight">
-                  Dispositivos Conectados
-                </h3>
-                <p className="text-[11px] text-gray-500 mt-0.5">
-                  {usuarioNombre ? `${usuarioNombre} • ` : ''}
-                  Máximo <strong>{MAX_DISPOSITIVOS_PERMITIDOS} dispositivos simultáneos</strong> permitidos
-                </p>
-              </div>
+            <div>
+              <h3 className="text-sm sm:text-base font-extrabold text-gray-900 leading-tight">
+                Dispositivos Conectados
+              </h3>
+              <p className="text-[11px] text-gray-500 mt-0.5">
+                {usuarioNombre ? `${usuarioNombre} • ` : ''}
+                Máximo <strong>{MAX_DISPOSITIVOS_PERMITIDOS} dispositivos simultáneos</strong> permitidos
+              </p>
             </div>
             <button
               type="button"
@@ -98,7 +93,7 @@ export default function ModalDispositivosConectados({
             <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500">
               Sesiones activas ({sesiones.length} de {MAX_DISPOSITIVOS_PERMITIDOS}):
             </span>
-            <span className="text-[10px] font-semibold text-[#3B2219] bg-[#F4ECE6] px-2 py-0.5 rounded-full">
+            <span className="text-[10px] font-semibold text-gray-600 bg-gray-100 px-2 py-0.5 rounded-full border border-gray-200">
               Límite: {MAX_DISPOSITIVOS_PERMITIDOS} equipos
             </span>
           </div>
@@ -125,20 +120,10 @@ export default function ModalDispositivosConectados({
                 return (
                   <div
                     key={sesion.id || idx}
-                    className={`flex items-center justify-between gap-3 p-3 rounded-xl border transition-all ${
-                      sesion.esActual
-                        ? 'border-emerald-200 bg-emerald-50/40 shadow-xs'
-                        : 'border-gray-200 bg-white hover:border-gray-300'
-                    }`}
+                    className="flex items-center justify-between gap-3 p-3 rounded-xl border border-gray-200 bg-white hover:border-gray-300 transition-all shadow-2xs"
                   >
                     <div className="flex items-center gap-3 min-w-0">
-                      <div
-                        className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
-                          sesion.esActual
-                            ? 'bg-emerald-100 text-emerald-700'
-                            : 'bg-gray-100 text-gray-600'
-                        }`}
-                      >
+                      <div className="w-9 h-9 rounded-xl bg-gray-100 text-gray-700 flex items-center justify-center shrink-0">
                         {esMovil ? <Smartphone size={17} /> : <Laptop size={17} />}
                       </div>
 
@@ -148,12 +133,12 @@ export default function ModalDispositivosConectados({
                             {sesion.dispositivo || `Dispositivo ${idx + 1}`}
                           </p>
                           {sesion.esActual ? (
-                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-emerald-100 text-emerald-800">
-                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[9px] font-bold bg-gray-100 text-gray-800 border border-gray-200">
+                              <span className="w-1.5 h-1.5 rounded-full bg-gray-600" />
                               Este dispositivo
                             </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-semibold bg-gray-100 text-gray-600">
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-semibold bg-gray-50 text-gray-500 border border-gray-200">
                               Remoto
                             </span>
                           )}
@@ -168,7 +153,7 @@ export default function ModalDispositivosConectados({
                     {/* Acciones */}
                     <div className="shrink-0">
                       {sesion.esActual ? (
-                        <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-100/80 px-2 py-1 rounded-lg select-none">
+                        <span className="text-[10px] font-semibold text-gray-700 bg-gray-100 border border-gray-200 px-2.5 py-1 rounded-lg select-none">
                           Sesión en uso
                         </span>
                       ) : (
@@ -194,15 +179,7 @@ export default function ModalDispositivosConectados({
             )}
           </div>
 
-          {/* Nota informativa */}
-          <div className="p-3 bg-gray-50 rounded-xl border border-gray-200 text-[10.5px] text-gray-600 leading-relaxed space-y-1">
-            <p>
-              💡 <strong>Seguridad de cuentas:</strong> Tu cuenta puede permanecer abierta hasta en <strong>2 dispositivos al mismo tiempo</strong> (por ejemplo: tu computadora de oficina y tu teléfono).
-            </p>
-            <p className="text-gray-500 text-[10px]">
-              Al pulsar <em>Cerrar sesión</em> en un dispositivo remoto, ese equipo se desconectará sin cerrar la sesión de tu equipo actual.
-            </p>
-          </div>
+
 
           {/* Footer */}
           <div className="flex items-center justify-end pt-2 border-t border-gray-100">

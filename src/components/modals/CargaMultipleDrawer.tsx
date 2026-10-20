@@ -44,7 +44,7 @@ interface CargaMultipleDrawerProps {
   documentosExistentes?: DocumentoBitacora[];
 }
 
-const CANTIDADES_RAPIDAS = [2, 3, 5, 8, 10];
+const CANTIDADES_RAPIDAS = [2, 4, 8];
 const ITEMS_POR_PAGINA = 2; // Paginación después del 2do documento
 
 export default function CargaMultipleDrawer({
@@ -65,7 +65,7 @@ export default function CargaMultipleDrawer({
 
   // Inicializar items con 3 elementos por defecto para evitar estado vacío
   const [items, setItems] = useState<ItemCargaMultiple[]>(() =>
-    Array.from({ length: 3 }, (_, i) => ({
+    Array.from({ length: 2 }, (_, i) => ({
       id: `item-${Date.now()}-${i}`,
       dia: Math.min(maxDiasInicial, Math.max(1, diaHoyInicial + i)),
       mes: mesRefInicial,
@@ -79,7 +79,7 @@ export default function CargaMultipleDrawer({
   const [subiendo, setSubiendo] = useState(false);
   const [progresoActual, setProgresoActual] = useState({ actual: 0, total: 0 });
   const [paginaActual, setPaginaActual] = useState(1);
-  const [cantidadPersonalizada, setCantidadPersonalizada] = useState('3');
+  const [cantidadPersonalizada, setCantidadPersonalizada] = useState('2');
 
   // Sincronizar items al abrir el drawer
   useEffect(() => {
@@ -90,7 +90,7 @@ export default function CargaMultipleDrawer({
       const anioInicial = Number(anioActual) || hoy.getFullYear();
       const maxDias = getDiasEnMes(mesInicial, anioInicial) || 31;
 
-      const itemsIniciales: ItemCargaMultiple[] = Array.from({ length: 3 }, (_, i) => ({
+      const itemsIniciales: ItemCargaMultiple[] = Array.from({ length: 2 }, (_, i) => ({
         id: `item-${Date.now()}-${i}`,
         dia: Math.min(maxDias, Math.max(1, diaHoy + i)),
         mes: mesInicial,
@@ -102,7 +102,7 @@ export default function CargaMultipleDrawer({
 
       setItems(itemsIniciales);
       setPaginaActual(1);
-      setCantidadPersonalizada('3');
+      setCantidadPersonalizada('2');
       setSubiendo(false);
       setProgresoActual({ actual: 0, total: 0 });
     }
@@ -424,29 +424,12 @@ export default function CargaMultipleDrawer({
                 />
               </div>
 
-              {/* Botón rápido +1 */}
-              <button
-                type="button"
-                onClick={handleAgregarItem}
-                className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-[#F4ECE6] text-[#3B2219] hover:bg-[#E8DCD4] text-xs font-bold transition-colors cursor-pointer"
-                title="Agregar un archivo más a la lista"
-              >
-                <Plus size={13} strokeWidth={2.5} />
-                <span>+1</span>
-              </button>
+
             </div>
           </div>
         </div>
 
-        {/* Indicador de mes bloqueado si aplica */}
-        {mesBloqueado && (
-          <div className="px-5 py-2 bg-amber-50/70 border-b border-amber-100/80 flex items-center gap-2 text-amber-900 text-[11px]">
-            <Lock size={12} className="text-amber-700 shrink-0" />
-            <span>
-              Ingreso exclusivo para <strong>{MESES_NOMBRES[(Number(mesActual) || 1) - 1]} {Number(anioActual) || 2026}</strong>. Solo puedes seleccionar el día correspondiente.
-            </span>
-          </div>
-        )}
+
 
         {/* Contenido con Scroll: Cards paginadas de a 2 */}
         <div className="flex-1 overflow-y-auto p-5 space-y-4">
